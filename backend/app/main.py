@@ -4,13 +4,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.providers.registry import registry
+from app.providers.catalog import list_provider_catalog
 
 
 app = FastAPI(
     title="AI UNIVERSE API",
     description="Central backend for AI UNIVERSE",
-    version="0.3.0",
+    version="0.4.0",
 )
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,7 +39,7 @@ async def root():
     return {
         "project": "AI UNIVERSE",
         "status": "online",
-        "version": "0.3.0",
+        "version": "0.4.0",
     }
 
 
@@ -54,6 +56,16 @@ async def health():
 async def list_providers():
     return {
         "providers": registry.list_providers()
+    }
+
+
+@app.get("/api/providers/catalog")
+async def get_provider_catalog():
+    providers = list_provider_catalog()
+
+    return {
+        "total": len(providers),
+        "providers": providers,
     }
 
 
