@@ -11,17 +11,17 @@ interface HealthResponse {
 const modules = [
   {
     name: "AI Chat",
-    description: "Chat with your AI models",
+    description: "AI chat interface prototype; live provider integrations are not connected",
     icon: "message",
-    color: "blue",
-    status: "Available",
+    iconClasses: "bg-blue-500/10 text-blue-300",
+    status: "Prototype",
     href: "#ai-chat",
   },
   {
     name: "AI Arena",
     description: "Compare multiple AI models",
     icon: "arena",
-    color: "purple",
+    iconClasses: "bg-purple-500/10 text-purple-300",
     status: "Coming soon",
     href: "#ai-arena",
   },
@@ -29,7 +29,7 @@ const modules = [
     name: "Research Lab",
     description: "Explore ideas and research",
     icon: "search",
-    color: "cyan",
+    iconClasses: "bg-cyan-500/10 text-cyan-300",
     status: "Planned",
     href: "#research",
   },
@@ -37,7 +37,7 @@ const modules = [
     name: "AI Classroom",
     description: "Learn with artificial intelligence",
     icon: "book",
-    color: "orange",
+    iconClasses: "bg-orange-500/10 text-orange-300",
     status: "Planned",
     href: "#classroom",
   },
@@ -45,7 +45,7 @@ const modules = [
     name: "Code Studio",
     description: "Your AI programming workspace",
     icon: "code",
-    color: "green",
+    iconClasses: "bg-green-500/10 text-green-300",
     status: "Planned",
     href: "#code-studio",
   },
@@ -53,7 +53,7 @@ const modules = [
     name: "Knowledge Base",
     description: "Organize your knowledge",
     icon: "database",
-    color: "pink",
+    iconClasses: "bg-pink-500/10 text-pink-300",
     status: "Planned",
     href: "#knowledge",
   },
@@ -61,7 +61,7 @@ const modules = [
     name: "Creative Studio",
     description: "Explore creative AI workflows",
     icon: "spark",
-    color: "yellow",
+    iconClasses: "bg-yellow-500/10 text-yellow-300",
     status: "Planned",
     href: "#creative",
   },
@@ -69,7 +69,7 @@ const modules = [
     name: "AI Agents",
     description: "Manage intelligent agents",
     icon: "bot",
-    color: "indigo",
+    iconClasses: "bg-indigo-500/10 text-indigo-300",
     status: "Planned",
     href: "#agents",
   },
@@ -236,8 +236,8 @@ export default function Home() {
               </div>
 
               <div className="mt-3 flex items-center justify-between text-xs">
-                <span className="text-slate-400">Ollama</span>
-                <span className="text-slate-500">Not checked</span>
+                <span className="text-slate-400">AI providers</span>
+                <span className="text-slate-500">Not connected</span>
               </div>
             </div>
 
@@ -250,7 +250,7 @@ export default function Home() {
             </a>
 
             <p className="mt-4 px-3 text-[10px] text-slate-600">
-              AI UNIVERSE · Version 0.2.0
+              AI UNIVERSE · Development build
             </p>
           </div>
         </aside>
@@ -373,11 +373,11 @@ export default function Home() {
                   </div>
 
                   <p className="mt-4 text-2xl font-bold text-blue-300">
-                    Ollama
+                    Not connected
                   </p>
 
                   <p className="mt-2 text-xs text-slate-500">
-                    Qwen3:4b · Provider configured
+                    11 providers planned · integrations unverified
                   </p>
                 </div>
 
@@ -428,7 +428,7 @@ export default function Home() {
                     className="group rounded-2xl border border-white/[0.07] bg-[#101727] p-5 transition duration-200 hover:-translate-y-1 hover:border-blue-400/30 hover:bg-[#141e32]"
                   >
                     <div
-                      className={`flex h-11 w-11 items-center justify-center rounded-xl bg-${module.color}-500/10 text-${module.color}-300`}
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${module.iconClasses}`}
                     >
                       <Icon name={module.icon} size={22} />
                     </div>
@@ -474,7 +474,8 @@ export default function Home() {
                   ["Project foundation", true],
                   ["Frontend and backend setup", true],
                   ["GitHub repository", true],
-                  ["Dashboard interface", false],
+                  ["Dashboard interface", true],
+                  ["Provider catalog and metadata", true],
                   ["Functional AI Chat", false],
                   ["Multi-model AI Arena", false],
                 ].map(([name, done]) => (

@@ -1,38 +1,22 @@
-# 🌌 AI UNIVERSE
+# AI UNIVERSE
 
-### Multi-AI Command Center
+**Multi-AI Command Center**
 
-**AI UNIVERSE** is a multi-AI platform designed to bring multiple artificial intelligence providers, models, and intelligent workflows together in one unified workspace.
+AI UNIVERSE is a multi-provider AI workspace in active development. Its goal is to bring supported cloud AI services and AI workflows into one unified interface.
 
-The project aims to provide a centralized environment where users can interact with different AI services, compare responses, conduct research, write code, learn, and manage knowledge.
+> **Current status:** The dashboard and initial provider architecture exist. The backend currently runs a mock provider only. No real AI provider integration is enabled.
 
-**Project Status:** Under Active Development
+## Project goals
 
----
+- A unified workspace for supported AI services
+- Compare model responses through an AI Arena
+- Research, learning, coding, and knowledge workflows
+- Provider-independent backend architecture
+- Account-level usage limits, cost controls, and privacy safeguards
 
-## 🚀 Vision
+## Planned provider catalog
 
-Build an extensible AI workspace that connects multiple cloud-based AI providers through a centralized backend and orchestration system.
-
-AI UNIVERSE is designed with a provider-independent architecture, allowing new AI services to be integrated without changing the core application.
-
----
-
-## ✨ Planned Features
-
-- **AI Hub:** Interact with different AI models.
-- **AI Arena:** Compare responses from multiple AI providers.
-- **Research Lab:** AI-assisted research and analysis.
-- **AI Classroom:** Learning and educational assistance.
-- **Code Studio:** AI-powered programming workspace.
-- **Knowledge Base:** Store, organize, and retrieve documents and knowledge.
-- **Creative Studio:** AI-assisted creative workflows.
-- **AI Agents:** Specialized agents for different tasks.
-- **Dashboard:** Centralized workspace and system overview.
-
----
-
-## 🧠 Planned AI Providers
+The catalog currently describes these 11 providers as planned entries:
 
 1. OpenAI — ChatGPT
 2. Google — Gemini
@@ -46,166 +30,140 @@ AI UNIVERSE is designed with a provider-independent architecture, allowing new A
 10. Mistral AI
 11. Perplexity
 
-Provider integrations are subject to official API availability, licensing, regional availability, age requirements, and applicable terms of service.
+These entries are **not active integrations**. API availability, official terms, licensing, age requirements, regional availability, and technical feasibility must be reviewed before enabling any provider. Some services may only be usable through their official external workspaces.
 
-Some services may be supported through external workspaces instead of direct API integration.
-
----
-
-## 🏗️ Core Architecture
-
-AI UNIVERSE is being developed around a modular, provider-independent architecture.
-
-Planned components:
-
-- **Provider Registry:** Register and manage AI providers.
-- **AI Orchestrator:** Coordinate AI tasks.
-- **Model Router:** Select suitable models for tasks.
-- **Task Manager:** Manage task execution.
-- **Shared Memory:** Maintain relevant conversation context.
-- **Quality Controller:** Evaluate AI responses.
-- **Fallback System:** Handle provider failures.
-- **Quota Manager:** Manage usage limits and API consumption.
-
-### Current Provider Architecture
-
-The backend currently includes:
-
-- **BaseProvider:** Abstract interface defining the provider contract.
-- **ProviderRegistry:** Registers providers and retrieves them by name.
-- **MockProvider:** A test provider used to verify the provider architecture.
-
-The current implementation uses a mock response. No real cloud AI provider has been integrated yet.
-
----
-
-## 🧰 Technology Stack
-
-### Frontend
-
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
+## Current implementation
 
 ### Backend
 
-- Python
-- FastAPI
-- Pydantic
-- HTTPX
+- FastAPI application
+- Health endpoint: `GET /api/health`
+- Provider listing: `GET /api/providers`
+- Provider catalog: `GET /api/providers/catalog`
+- Chat endpoint: `POST /api/chat`
+- `BaseProvider` abstract provider contract
+- `ProviderRegistry` for provider registration and lookup
+- `MockProvider` for local architecture testing
+- Pydantic provider schemas
+- Automated provider catalog tests
 
-### Development Tools
+The chat endpoint currently uses the mock provider. It does not call OpenAI, Gemini, or any other external AI service.
 
-- Visual Studio Code
-- Git
-- GitHub
+### Frontend
 
-### Planned Infrastructure
+- Next.js App Router
+- React and TypeScript
+- Tailwind CSS
+- Dashboard interface
+- Backend health check against `http://127.0.0.1:8010/api/health`
 
-- SQLite for initial persistent storage.
-- PostgreSQL for future production deployment.
-- pgvector for future semantic search and retrieval.
+The AI workspace modules are interface placeholders unless explicitly stated otherwise. A visible module card does not mean its underlying feature is implemented.
 
----
+## Technology stack
 
-## 📁 Project Structure
+- **Frontend:** Next.js, React, TypeScript, Tailwind CSS
+- **Backend:** Python, FastAPI, Pydantic, Uvicorn
+- **Testing:** pytest
+- **Tooling:** Git, GitHub, Visual Studio Code
+
+## Repository structure
 
 ```text
 AI-UNIVERSE/
-├── frontend/
-│   └── src/
-│       └── app/
 ├── backend/
 │   ├── app/
-│   │   ├── api/
-│   │   ├── core/
-│   │   ├── agents/
+│   │   ├── main.py
 │   │   ├── providers/
-│   │   ├── orchestrator/
-│   │   ├── database/
-│   │   ├── services/
+│   │   │   ├── base.py
+│   │   │   ├── catalog.py
+│   │   │   ├── mock_provider.py
+│   │   │   └── registry.py
 │   │   └── schemas/
-│   └── tests/
-├── storage/
-│   ├── documents/
-│   ├── knowledge/
-│   └── backups/
-├── docs/
-├── scripts/
+│   │       └── provider.py
+│   ├── tests/
+│   │   └── test_providers/
+│   │       └── test_catalog.py
+│   ├── requirements.txt
+│   └── requirements-dev.txt
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   │   └── app/
+│   │       ├── globals.css
+│   │       ├── icon.svg
+│   │       ├── layout.tsx
+│   │       └── page.tsx
+│   ├── package.json
+│   ├── package-lock.json
+│   └── next.config.ts
 ├── .gitignore
 └── README.md
 ```
 
----
+## Run locally
 
-## 📊 Development Status
+### Backend
 
-### Completed
+Open PowerShell:
 
-- Initial project structure.
-- Next.js frontend setup.
-- FastAPI backend setup.
-- Backend health endpoint.
-- Provider-independent base architecture.
-- Provider registry.
-- Mock provider.
-- Frontend dashboard.
-- Frontend-to-backend health integration.
-- Initial Git and GitHub repository setup.
+```powershell
+cd "$HOME\AI-UNIVERSE\backend"
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8010
+```
 
-### In Progress
+Backend health: `http://127.0.0.1:8010/api/health`
 
-- Completing provider configuration architecture.
-- Designing provider metadata and capability definitions.
-- Improving frontend and backend integration.
-- Expanding automated tests.
+Interactive API documentation: `http://127.0.0.1:8010/docs`
 
-### Planned
+### Frontend
 
-- Official cloud AI provider integrations where permitted.
-- External AI workspace support where appropriate.
-- AI Chat interface.
-- AI Arena and response comparison.
-- Model routing and orchestration.
-- Authentication and user management.
-- Per-user usage quotas.
-- Persistent conversation history.
-- Knowledge Base and document retrieval.
-- Production deployment.
+Open a second terminal:
 
----
+```powershell
+cd "$HOME\AI-UNIVERSE\frontend"
+npm ci
+npm run dev
+```
 
-## 🔐 Security and Design Principles
+Frontend: `http://localhost:3000`
 
-- API keys must remain on the backend.
-- Secrets and environment files must never be committed to Git.
-- Provider integrations must comply with official terms and licensing.
-- Age and regional restrictions must be respected.
-- API usage must be monitored and controlled.
-- User data must be handled with appropriate privacy safeguards.
-- Provider failures must be handled safely.
-- No unauthorized API access or endpoint usage.
-- No local AI model dependency; AI integrations are designed around cloud services.
+## Tests and quality checks
 
----
+Backend tests:
 
-## 🎯 Future Goals
+```powershell
+cd "$HOME\AI-UNIVERSE\backend"
+.\.venv\Scripts\python.exe -m pytest
+```
 
-The long-term goal is to build a unified AI environment that makes it easier to access, compare, and coordinate multiple AI services through one extensible platform.
+Frontend checks:
 
-AI UNIVERSE aims to evolve into a modular ecosystem for AI interaction, research, education, development, and intelligent automation.
+```powershell
+cd "$HOME\AI-UNIVERSE\frontend"
+npm run lint
+npm run build
+```
 
----
+## Security principles
 
-## 📌 Project Information
+- Keep provider API keys on the backend only.
+- Never commit `.env` files, credentials, or tokens.
+- Do not expose secrets in frontend code or browser responses.
+- Integrate providers only through authorized official APIs or permitted official workspaces.
+- Respect provider terms, age requirements, regional restrictions, and licensing.
+- Apply authentication, per-user quotas, rate limits, and cost controls before public production use.
+- Do not silently switch users to paid providers or paid endpoints.
+- Do not depend on local model runtimes or user GPUs.
 
-**Project Name:** AI UNIVERSE
+## Development status
 
-**Category:** Multi-AI Platform
+Implemented: initial frontend dashboard, backend health endpoint, provider abstraction, provider registry, mock provider, provider catalog metadata, and catalog tests.
 
-**Architecture:** Provider-Based
+Not yet implemented: real provider API integrations, production authentication, user-specific quotas, persistent chat history, model routing, multi-model orchestration, and production deployment.
 
-**Development Status:** Active Development
+## Project
 
-**Repository:** https://github.com/MehrbodDev/AI-UNIVERSE
+- **Name:** AI UNIVERSE
+- **Type:** Multi-AI platform
+- **Status:** Active development
+- **Repository:** https://github.com/MehrbodDev/AI-UNIVERSE
