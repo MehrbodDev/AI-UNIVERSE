@@ -1,0 +1,124 @@
+import pytest
+from pydantic import ValidationError
+
+from app.config.settings import (
+    AppSettings,
+    ProviderSettings,
+    load_app_settings,
+)
+from app.config.providers import PROVIDER_IDS, load_provider_settings
+
+
+def test_app_settings_defaults():
+    config = AppSettings(
+        environment="development",
+        debug=False,
+        api_timeout=30,
+    )
+
+    assert config.app_name == "AI UNIVERSE"
+    assert config.environment == "development"
+    assert config.debug is False
+    assert config.api_timeout == 30
+
+
+def test_app_settings_environment_variables(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "testing")
+    monkeypatch.setenv("APP_DEBUG", "true")
+    monkeypatch.setenv("API_TIMEOUT", "45")
+
+    config = load_app_settings()
+
+    assert config.environment == "testing"
+    assert config.debug is True
+    assert config.api_timeout == 45
+
+
+def test_app_settings_rejects_invalid_timeout():
+    with pytest.raises(ValidationError):
+        AppSettings(api_timeout=0)
+
+    with pytest.raises(ValidationError):
+        AppSettings(api_timeout=301)
+
+
+def test_provider_ids_are_unique():
+    assert len(PROVIDER_IDS) == 11
+    assert len(set(PROVIDER_IDS)) == 11
+
+
+def test_all_providers_are_disabled_by_default(monkeypatch):
+    for provider_id in PROVIDER_IDS:
+        prefix = f"AI_UNIVERSE_{provider_id.upper()}"
+        monkeypatch.delenv(f"{prefix}_ENABLED", raising=False)
+
+    configs = load_provider_settings()
+
+    assert len(configs) == 11
+    assert all(not config.enabled for config in configs.values())
+
+
+def test_provider_environment_override(monkeypatch):
+    monkeypatch.setenv("AI_UNIVERSE_OPENAI_ENABLED", "true")
+    monkeypatch.setenv("AI_UNIVERSE_OPENAI_MODEL", "test-model")
+    monkeypatch.setenv("AI_UNIVERSE_OPENAI_TIMEOUT", "60")
+
+    configs = load_provider_settings()
+    openai = configs["openai"]
+
+    assert openai.enabled is True
+    assert openai.default_model == "test-model"
+    assert openai.timeout == 60
+
+
+def test_provider_api_key_is_masked():
+    config = ProviderSettings(api_key="test-secret-key")
+
+    assert str(config.api_key) == "**********"
+    assert "test-secret-key" not in repr(config)
+
+
+def test_provider_rejects_invalid_timeout():
+    with pytest.raises(ValidationError):
+        ProviderSettings(timeout=0)
+
+    with pytest.raises(ValidationError):
+        ProviderSettings(timeout=301)
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("true", True),
+        ("TRUE", True),
+        ("True", True),
+        ("false", False),
+        ("FALSE", False),
+        ("False", False),
+    ],
+)
+def test_parse_env_bool(value, expected):
+    from app.config.settings import parse_env_bool
+
+    assert parse_env_bool(value, "TEST_VARIABLE") is expected
+
+
+@pytest.mark.parametrize("value", ["yes", "no", "1", "0", "invalid", ""])
+def test_parse_env_bool_rejects_invalid_values(value):
+    from app.config.settings import parse_env_bool
+
+    with pytest.raises(ValueError, match="TEST_VARIABLE"):
+        parse_env_bool(value, "TEST_VARIABLE")
+
+
+def test_app_settings_rejects_invalid_debug_value(monkeypatch):
+    monkeypatch.setenv("APP_DEBUG", "invalid")
+
+    with pytest.raises(ValueError, match="APP_DEBUG"):
+        load_app_settings()
+
+
+def test_provider_rejects_invalid_enabled_value(monkeypatch):
+    monkeypatch.setenv("AI_UNIVERSE_OPENAI_ENABLED", "invalid")
+
+    with pytest.raises(ValueError, match="AI_UNIVERSE_OPENAI_ENABLED"):
+        load_provider_settings()

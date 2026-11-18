@@ -1,11 +1,34 @@
 
+from app.config.providers import provider_settings as default_provider_settings
+from app.config.settings import ProviderSettings
 from app.providers.base import BaseProvider
 from app.providers.mock_provider import MockProvider
 
 
 class ProviderRegistry:
-    def __init__(self):
+    def __init__(
+        self,
+        provider_configs: dict[str, ProviderSettings] | None = None,
+    ):
         self._providers: dict[str, BaseProvider] = {}
+
+        configs = (
+            default_provider_settings
+            if provider_configs is None
+            else provider_configs
+        )
+
+        self._provider_configs: dict[str, ProviderSettings] = {}
+
+        for name, config in configs.items():
+            self._validate_name(name)
+
+            if not isinstance(config, ProviderSettings):
+                raise TypeError(
+                    f"Configuration for '{name}' must be ProviderSettings."
+                )
+
+            self._provider_configs[name] = config
 
     @staticmethod
     def _validate_name(name: str) -> str:
@@ -13,7 +36,9 @@ class ProviderRegistry:
             raise ValueError("Provider name must be a non-empty string.")
 
         if name != name.strip():
-            raise ValueError("Provider name cannot contain surrounding whitespace.")
+            raise ValueError(
+                "Provider name cannot contain surrounding whitespace."
+            )
 
         return name
 
@@ -52,6 +77,30 @@ class ProviderRegistry:
 
         del self._providers[name]
         return True
+
+    def get_provider_config(self, name: str) -> ProviderSettings:
+        name = self._validate_name(name)
+        config = self._provider_configs.get(name)
+
+        if config is None:
+            raise ValueError(
+                f"Configuration for provider '{name}' was not found."
+            )
+
+        return config
+
+    def list_provider_configs(self) -> list[dict[str, object]]:
+        return [
+            {
+                "name": name,
+                "enabled": config.enabled,
+                "has_api_key": config.api_key is not None,
+                "base_url": config.base_url,
+                "default_model": config.default_model,
+                "timeout": config.timeout,
+            }
+            for name, config in sorted(self._provider_configs.items())
+        ]
 
     def list_providers(self) -> list[dict[str, str]]:
         return [
