@@ -1,4 +1,3 @@
-
 from app.providers.adapters.base import BaseAdapter
 from app.providers.models import ProviderRequest, ProviderResponse
 
@@ -18,6 +17,14 @@ class MockAdapter(BaseAdapter):
                 "Request must be an instance of ProviderRequest."
             )
 
+        return await self._execute(
+            lambda: self._generate(request)
+        )
+
+    async def _generate(
+        self,
+        request: ProviderRequest,
+    ) -> ProviderResponse:
         message = request.message
 
         content = (
