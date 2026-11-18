@@ -1,3 +1,4 @@
+
 import asyncio
 
 import pytest
@@ -110,3 +111,49 @@ def test_factory_preserves_explicit_request_model():
     )
 
     assert response.model == "requested-model"
+
+
+def test_factory_reports_mock_as_supported():
+    assert ProviderFactory.supports_provider("mock") is True
+
+
+@pytest.mark.parametrize(
+    "provider_id",
+    [
+        "openai",
+        "gemini",
+        "claude",
+        "unknown",
+        "",
+        " ",
+    ],
+)
+def test_factory_reports_external_providers_as_unsupported(provider_id):
+    assert ProviderFactory.supports_provider(provider_id) is False
+
+
+def test_factory_creates_provider_by_id():
+    settings = ProviderSettings(default_model="factory-mock-model")
+
+    provider = ProviderFactory.create_provider("mock", settings)
+
+    assert isinstance(provider, MockProvider)
+    assert provider.model_name == "factory-mock-model"
+
+
+def test_factory_rejects_unsupported_provider_creation():
+    with pytest.raises(ValueError, match="No provider implementation"):
+        ProviderFactory.create_provider(
+            "openai",
+            ProviderSettings(),
+        )
+
+
+def test_factory_rejects_invalid_provider_id():
+    with pytest.raises(ValueError, match="non-empty"):
+        ProviderFactory.create_provider("", ProviderSettings())
+
+
+def test_factory_rejects_provider_id_with_whitespace():
+    with pytest.raises(ValueError, match="surrounding whitespace"):
+        ProviderFactory.create_provider(" mock ", ProviderSettings())

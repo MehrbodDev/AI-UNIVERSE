@@ -158,7 +158,7 @@ def test_missing_api_key():
     assert result.has_api_key is False
 
 
-def test_provider_not_registered():
+def test_provider_without_implementation_is_integration_unavailable():
     registry = make_registry(
         enabled=True,
         api_key="test-api-key",
@@ -168,7 +168,7 @@ def test_provider_not_registered():
 
     result = manager.get_status("openai")
 
-    assert result.status == ProviderLifecycleStatus.NOT_REGISTERED
+    assert result.status == ProviderLifecycleStatus.INTEGRATION_UNAVAILABLE
     assert result.registered is False
 
 
@@ -207,7 +207,7 @@ def test_list_statuses_returns_all_catalog_providers():
     assert len(results) == 2
 
     assert results[0].provider_id == "openai"
-    assert results[0].status == ProviderLifecycleStatus.NOT_REGISTERED
+    assert results[0].status == ProviderLifecycleStatus.INTEGRATION_UNAVAILABLE
 
     assert results[1].provider_id == "gemini"
     assert results[1].status == ProviderLifecycleStatus.CONFIGURATION_REQUIRED
@@ -290,3 +290,101 @@ def test_api_key_is_never_exposed_in_result():
 
     assert not hasattr(result, "api_key")
     assert "secret-test-key" not in str(result.model_dump())
+
+
+def make_mock_registry():
+    config = ProviderSettings(
+        enabled=True,
+        api_key="test-mock-key",
+        default_model="lifecycle-mock-model",
+    )
+
+    return ProviderRegistry(
+        provider_configs={"mock": config}
+    )
+
+
+def make_mock_catalog():
+    return [
+        make_catalog_entry(
+            id="mock",
+            name="Mock",
+            company="AI UNIVERSE",
+        )
+    ]
+
+
+def test_mock_provider_is_not_registered_before_activation():
+    registry = make_mock_registry()
+    manager = ProviderLifecycleManager(
+        registry,
+        make_mock_catalog(),
+    )
+
+    result = manager.get_status("mock")
+
+    assert result.status == ProviderLifecycleStatus.NOT_REGISTERED
+    assert result.registered is False
+
+
+def test_activate_provider_registers_supported_mock():
+    registry = make_mock_registry()
+    manager = ProviderLifecycleManager(
+        registry,
+        make_mock_catalog(),
+    )
+
+    result = manager.activate_provider("mock")
+
+    assert result.status == ProviderLifecycleStatus.READY
+    assert result.registered is True
+    assert registry.has_provider("mock") is True
+    assert registry.get("mock").model_name == "lifecycle-mock-model"
+
+
+def test_activate_provider_does_not_register_unsupported_provider():
+    registry = make_registry(
+        enabled=True,
+        api_key="test-api-key",
+    )
+    manager = ProviderLifecycleManager(
+        registry,
+        [make_catalog_entry()],
+    )
+
+    result = manager.activate_provider("openai")
+
+    assert result.status == ProviderLifecycleStatus.INTEGRATION_UNAVAILABLE
+    assert result.registered is False
+    assert registry.has_provider("openai") is False
+
+
+def test_activate_provider_does_not_bypass_planned_status():
+    registry = make_registry(
+        enabled=True,
+        api_key="test-api-key",
+    )
+    manager = ProviderLifecycleManager(registry)
+
+    result = manager.activate_provider("openai")
+
+    assert result.status == ProviderLifecycleStatus.PLANNED
+    assert result.registered is False
+    assert registry.has_provider("openai") is False
+
+
+def test_activate_provider_is_idempotent():
+    registry = make_mock_registry()
+    manager = ProviderLifecycleManager(
+        registry,
+        make_mock_catalog(),
+    )
+
+    first_result = manager.activate_provider("mock")
+    second_result = manager.activate_provider("mock")
+
+    assert first_result.status == ProviderLifecycleStatus.READY
+    assert second_result.status == ProviderLifecycleStatus.READY
+    assert registry.list_providers() == [
+        {"name": "mock", "model": "lifecycle-mock-model"}
+    ]

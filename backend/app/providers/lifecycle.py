@@ -4,6 +4,7 @@ from enum import Enum
 from pydantic import BaseModel
 
 from app.providers.catalog import list_provider_catalog
+from app.providers.factory import ProviderFactory
 from app.providers.registry import ProviderRegistry
 from app.schemas.provider import (
     AgePolicyStatus,
@@ -19,6 +20,7 @@ class ProviderLifecycleStatus(str, Enum):
     DISABLED = "disabled"
     POLICY_REVIEW_REQUIRED = "policy_review_required"
     CONFIGURATION_REQUIRED = "configuration_required"
+    INTEGRATION_UNAVAILABLE = "integration_unavailable"
     NOT_REGISTERED = "not_registered"
     READY = "ready"
 
@@ -33,12 +35,25 @@ class ProviderLifecycleInfo(BaseModel):
 
 
 class ProviderLifecycleManager:
+    """Evaluate and control the internal provider lifecycle."""
+
     def __init__(
         self,
         registry: ProviderRegistry,
         catalog: list[dict] | None = None,
+        factory: type[ProviderFactory] = ProviderFactory,
     ):
+        if not isinstance(registry, ProviderRegistry):
+            raise TypeError("Registry must be a ProviderRegistry instance.")
+
+        if not isinstance(factory, type):
+            raise TypeError("Factory must be a ProviderFactory class.")
+
+        if not issubclass(factory, ProviderFactory):
+            raise TypeError("Factory must inherit from ProviderFactory.")
+
         self._registry = registry
+        self._factory = factory
 
         catalog_entries = (
             list_provider_catalog()
@@ -155,13 +170,42 @@ class ProviderLifecycleManager:
                 "Provider API key is missing.",
             )
 
-        if not registered:
+        if registered:
             return result(
-                ProviderLifecycleStatus.NOT_REGISTERED,
-                "Provider is configured but not registered.",
+                ProviderLifecycleStatus.READY,
+                "Provider passed all internal readiness checks.",
+            )
+
+        if not self._factory.supports_provider(provider_id):
+            return result(
+                ProviderLifecycleStatus.INTEGRATION_UNAVAILABLE,
+                "No provider implementation is currently available.",
             )
 
         return result(
-            ProviderLifecycleStatus.READY,
-            "Provider passed all internal readiness checks.",
+            ProviderLifecycleStatus.NOT_REGISTERED,
+            "Provider is configured but not registered.",
         )
+
+    def activate_provider(
+        self,
+        provider_id: str,
+    ) -> ProviderLifecycleInfo:
+        """
+        Activate a provider only after all lifecycle checks pass.
+
+        This method does not bypass catalog, policy, configuration,
+        API-key, or factory-support requirements.
+        """
+
+        current_status = self.get_status(provider_id)
+
+        if current_status.status != ProviderLifecycleStatus.NOT_REGISTERED:
+            return current_status
+
+        self._registry.register_configured_provider(
+            provider_id,
+            factory=self._factory,
+        )
+
+        return self.get_status(provider_id)

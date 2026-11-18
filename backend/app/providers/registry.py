@@ -1,3 +1,4 @@
+
 from app.config.providers import provider_settings as default_provider_settings
 from app.config.settings import ProviderSettings
 from app.providers.base import BaseProvider
@@ -5,6 +6,8 @@ from app.providers.factory import ProviderFactory
 
 
 class ProviderRegistry:
+    """Store provider instances and their validated configurations."""
+
     def __init__(
         self,
         provider_configs: dict[str, ProviderSettings] | None = None,
@@ -42,6 +45,8 @@ class ProviderRegistry:
         return name
 
     def register(self, provider: BaseProvider) -> None:
+        """Register an already-created provider instance."""
+
         if not isinstance(provider, BaseProvider):
             raise TypeError("Provider must inherit from BaseProvider.")
 
@@ -57,6 +62,63 @@ class ProviderRegistry:
             raise ValueError(f"Provider '{name}' is already registered.")
 
         self._providers[name] = provider
+
+    def register_configured_provider(
+        self,
+        name: str,
+        factory: type[ProviderFactory] = ProviderFactory,
+    ) -> BaseProvider:
+        """
+        Create and register a provider from its configuration.
+
+        Configuration alone never causes automatic registration.
+        The provider must be enabled, have an API key, and have a
+        supported implementation in the supplied factory.
+        """
+
+        name = self._validate_name(name)
+
+        if not isinstance(factory, type):
+            raise TypeError("Factory must be a ProviderFactory class.")
+
+        if not issubclass(factory, ProviderFactory):
+            raise TypeError("Factory must inherit from ProviderFactory.")
+
+        if name in self._providers:
+            raise ValueError(f"Provider '{name}' is already registered.")
+
+        config = self.get_provider_config(name)
+
+        if not config.enabled:
+            raise ValueError(
+                f"Provider '{name}' is disabled in its configuration."
+            )
+
+        if config.api_key is None:
+            raise ValueError(
+                f"Provider '{name}' API key is missing."
+            )
+
+        if not factory.supports_provider(name):
+            raise ValueError(
+                f"No provider implementation is available for '{name}'."
+            )
+
+        provider = factory.create_provider(name, config)
+
+        if not isinstance(provider, BaseProvider):
+            raise TypeError(
+                "Factory must return an instance of BaseProvider."
+            )
+
+        if provider.provider_name != name:
+            raise ValueError(
+                "Created provider identity does not match its configuration."
+            )
+
+        self.register(provider)
+
+        return provider
 
     def get(self, name: str) -> BaseProvider:
         name = self._validate_name(name)

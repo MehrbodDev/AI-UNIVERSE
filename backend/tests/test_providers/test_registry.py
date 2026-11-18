@@ -1,8 +1,10 @@
+
 import pytest
 
 from app.config.providers import PROVIDER_IDS
 from app.config.settings import ProviderSettings
 from app.providers.base import BaseProvider
+from app.providers.factory import ProviderFactory
 from app.providers.mock_provider import MockProvider
 from app.providers.registry import ProviderRegistry
 
@@ -135,3 +137,128 @@ def test_global_registry_only_registers_mock_provider():
     assert global_registry.list_providers() == [
         {"name": "mock", "model": "mock-v1"}
     ]
+
+
+def test_register_configured_mock_provider():
+    config = ProviderSettings(
+        enabled=True,
+        api_key="internal-test-key",
+        default_model="configured-mock",
+    )
+
+    registry = ProviderRegistry(
+        provider_configs={"mock": config}
+    )
+
+    provider = registry.register_configured_provider("mock")
+
+    assert isinstance(provider, MockProvider)
+    assert provider.model_name == "configured-mock"
+    assert registry.get("mock") is provider
+
+
+def test_register_configured_provider_rejects_disabled_configuration():
+    config = ProviderSettings(
+        enabled=False,
+        api_key="test-key",
+    )
+
+    registry = ProviderRegistry(
+        provider_configs={"mock": config}
+    )
+
+    with pytest.raises(ValueError, match="disabled"):
+        registry.register_configured_provider("mock")
+
+    assert registry.has_provider("mock") is False
+
+
+def test_register_configured_provider_rejects_missing_api_key():
+    config = ProviderSettings(
+        enabled=True,
+        api_key=None,
+    )
+
+    registry = ProviderRegistry(
+        provider_configs={"mock": config}
+    )
+
+    with pytest.raises(ValueError, match="API key"):
+        registry.register_configured_provider("mock")
+
+    assert registry.has_provider("mock") is False
+
+
+def test_register_configured_provider_rejects_unsupported_provider():
+    config = ProviderSettings(
+        enabled=True,
+        api_key="test-key",
+    )
+
+    registry = ProviderRegistry(
+        provider_configs={"openai": config}
+    )
+
+    with pytest.raises(ValueError, match="No provider implementation"):
+        registry.register_configured_provider("openai")
+
+    assert registry.has_provider("openai") is False
+
+
+def test_register_configured_provider_rejects_missing_configuration():
+    registry = ProviderRegistry(provider_configs={})
+
+    with pytest.raises(ValueError, match="Configuration"):
+        registry.register_configured_provider("mock")
+
+
+def test_register_configured_provider_rejects_duplicate_registration():
+    config = ProviderSettings(
+        enabled=True,
+        api_key="test-key",
+    )
+
+    registry = ProviderRegistry(
+        provider_configs={"mock": config}
+    )
+
+    registry.register(MockProvider())
+
+    with pytest.raises(ValueError, match="already registered"):
+        registry.register_configured_provider("mock")
+
+
+def test_register_configured_provider_does_not_expose_api_key():
+    config = ProviderSettings(
+        enabled=True,
+        api_key="secret-test-key",
+    )
+
+    registry = ProviderRegistry(
+        provider_configs={"mock": config}
+    )
+
+    registry.register_configured_provider("mock")
+
+    assert "secret-test-key" not in str(registry.list_provider_configs())
+
+
+def test_register_configured_provider_rejects_invalid_factory():
+    config = ProviderSettings(
+        enabled=True,
+        api_key="test-key",
+    )
+
+    registry = ProviderRegistry(
+        provider_configs={"mock": config}
+    )
+
+    with pytest.raises(TypeError, match="Factory"):
+        registry.register_configured_provider(
+            "mock",
+            factory="invalid",
+        )
+
+
+def test_factory_import_is_available():
+    assert ProviderFactory.supports_provider("mock") is True
