@@ -63,7 +63,6 @@ class DummyProvider(BaseProvider):
 
 def test_default_catalog_provider_is_planned():
     registry = make_registry()
-
     manager = ProviderLifecycleManager(registry)
 
     result = manager.get_status("openai")
@@ -79,7 +78,6 @@ def test_configuration_does_not_override_planned_status():
         enabled=True,
         api_key="test-api-key",
     )
-
     manager = ProviderLifecycleManager(registry)
 
     result = manager.get_status("openai")
@@ -91,11 +89,9 @@ def test_configuration_does_not_override_planned_status():
 
 def test_disabled_catalog_provider():
     registry = make_registry()
-
     catalog = [
         make_catalog_entry(status=ProviderStatus.DISABLED)
     ]
-
     manager = ProviderLifecycleManager(registry, catalog)
 
     result = manager.get_status("openai")
@@ -105,13 +101,11 @@ def test_disabled_catalog_provider():
 
 def test_unapproved_policy_requires_review():
     registry = make_registry()
-
     catalog = [
         make_catalog_entry(
             age_policy_status=AgePolicyStatus.NOT_REVIEWED
         )
     ]
-
     manager = ProviderLifecycleManager(registry, catalog)
 
     result = manager.get_status("openai")
@@ -121,11 +115,9 @@ def test_unapproved_policy_requires_review():
 
 def test_limited_provider_requires_review():
     registry = make_registry()
-
     catalog = [
         make_catalog_entry(status=ProviderStatus.LIMITED)
     ]
-
     manager = ProviderLifecycleManager(registry, catalog)
 
     result = manager.get_status("openai")
@@ -135,9 +127,7 @@ def test_limited_provider_requires_review():
 
 def test_missing_configuration():
     registry = ProviderRegistry(provider_configs={})
-
     catalog = [make_catalog_entry()]
-
     manager = ProviderLifecycleManager(registry, catalog)
 
     result = manager.get_status("openai")
@@ -149,9 +139,7 @@ def test_missing_configuration():
 
 def test_disabled_configuration():
     registry = make_registry(enabled=False)
-
     catalog = [make_catalog_entry()]
-
     manager = ProviderLifecycleManager(registry, catalog)
 
     result = manager.get_status("openai")
@@ -161,9 +149,7 @@ def test_disabled_configuration():
 
 def test_missing_api_key():
     registry = make_registry(api_key=None)
-
     catalog = [make_catalog_entry()]
-
     manager = ProviderLifecycleManager(registry, catalog)
 
     result = manager.get_status("openai")
@@ -177,9 +163,7 @@ def test_provider_not_registered():
         enabled=True,
         api_key="test-api-key",
     )
-
     catalog = [make_catalog_entry()]
-
     manager = ProviderLifecycleManager(registry, catalog)
 
     result = manager.get_status("openai")
@@ -194,9 +178,7 @@ def test_provider_ready_when_all_conditions_are_met():
         api_key="test-api-key",
         register_provider=True,
     )
-
     catalog = [make_catalog_entry()]
-
     manager = ProviderLifecycleManager(registry, catalog)
 
     result = manager.get_status("openai")
@@ -207,13 +189,61 @@ def test_provider_ready_when_all_conditions_are_met():
     assert result.has_api_key is True
 
 
+def test_list_statuses_returns_all_catalog_providers():
+    registry = make_registry()
+
+    catalog = [
+        make_catalog_entry(),
+        make_catalog_entry(
+            id="gemini",
+            name="Gemini",
+            company="Google",
+        ),
+    ]
+
+    manager = ProviderLifecycleManager(registry, catalog)
+    results = manager.list_statuses()
+
+    assert len(results) == 2
+
+    assert results[0].provider_id == "openai"
+    assert results[0].status == ProviderLifecycleStatus.NOT_REGISTERED
+
+    assert results[1].provider_id == "gemini"
+    assert results[1].status == ProviderLifecycleStatus.CONFIGURATION_REQUIRED
+
+
+def test_list_statuses_preserves_catalog_order():
+    registry = make_registry()
+
+    catalog = [
+        make_catalog_entry(
+            id="gemini",
+            name="Gemini",
+            company="Google",
+        ),
+        make_catalog_entry(
+            id="openai",
+            name="ChatGPT",
+            company="OpenAI",
+        ),
+    ]
+
+    manager = ProviderLifecycleManager(registry, catalog)
+    results = manager.list_statuses()
+
+    assert [result.provider_id for result in results] == [
+        "gemini",
+        "openai",
+    ]
+
+
 @pytest.mark.parametrize(
     "provider_id",
     ["", " ", " openai", "openai ", None, 123],
 )
 def test_invalid_provider_id(provider_id):
     registry = make_registry()
-
     manager = ProviderLifecycleManager(
         registry,
         [make_catalog_entry()],
@@ -225,7 +255,6 @@ def test_invalid_provider_id(provider_id):
 
 def test_unknown_provider_id():
     registry = make_registry()
-
     manager = ProviderLifecycleManager(
         registry,
         [make_catalog_entry()],
@@ -252,7 +281,6 @@ def test_api_key_is_never_exposed_in_result():
         enabled=True,
         api_key="secret-test-key",
     )
-
     manager = ProviderLifecycleManager(
         registry,
         [make_catalog_entry()],

@@ -58,6 +58,12 @@ class ProviderLifecycleManager:
 
             self._catalog[provider.id] = provider
 
+    def list_statuses(self) -> list[ProviderLifecycleInfo]:
+        return [
+            self.get_status(provider_id)
+            for provider_id in self._catalog
+        ]
+
     def get_status(self, provider_id: str) -> ProviderLifecycleInfo:
         if not isinstance(provider_id, str) or not provider_id.strip():
             raise ValueError("Provider ID must be a non-empty string.")

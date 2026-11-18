@@ -3,8 +3,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from app.providers.registry import registry
 from app.providers.catalog import list_provider_catalog
+from app.providers.lifecycle import (
+    ProviderLifecycleInfo,
+    ProviderLifecycleManager,
+)
+from app.providers.registry import registry
 
 
 app = FastAPI(
@@ -21,6 +25,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+lifecycle_manager = ProviderLifecycleManager(registry)
 
 
 class ChatRequest(BaseModel):
@@ -67,6 +74,34 @@ async def get_provider_catalog():
         "total": len(providers),
         "providers": providers,
     }
+
+
+@app.get("/api/providers/lifecycle")
+async def get_provider_lifecycle_list():
+    statuses = lifecycle_manager.list_statuses()
+
+    return {
+        "total": len(statuses),
+        "providers": [
+            status.model_dump(mode="json")
+            for status in statuses
+        ],
+    }
+
+
+@app.get(
+    "/api/providers/{provider_id}/lifecycle",
+    response_model=ProviderLifecycleInfo,
+)
+async def get_provider_lifecycle(provider_id: str):
+    try:
+        return lifecycle_manager.get_status(provider_id)
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        ) from error
 
 
 @app.post("/api/chat", response_model=ChatResponse)
