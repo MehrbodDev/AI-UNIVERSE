@@ -30,3 +30,6 @@ Thumbs.db
 
 # Local data
 storage/backups/
+
+.pytest_cache/
+.coverage

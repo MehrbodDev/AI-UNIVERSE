@@ -1,7 +1,14 @@
-from typing import Any
+
+from app.schemas.provider import (
+    ProviderInfo,
+    ProviderStatus,
+    IntegrationMode,
+    VerificationStatus,
+    AgePolicyStatus,
+)
 
 
-PROVIDER_CATALOG: list[dict[str, Any]] = [
+PROVIDER_CATALOG = [
     {
         "id": "openai",
         "name": "ChatGPT",
@@ -60,17 +67,22 @@ PROVIDER_CATALOG: list[dict[str, Any]] = [
 ]
 
 
-def list_provider_catalog() -> list[dict[str, Any]]:
-    return [
-        {
+def list_provider_catalog() -> list[dict]:
+    providers = []
+
+    for provider in PROVIDER_CATALOG:
+        provider_info = ProviderInfo(
             **provider,
-            "status": "planned",
-            "enabled": False,
-            "integration_mode": "undetermined",
-            "api_status": "not_verified",
-            "age_policy_status": "not_reviewed",
-            "models": [],
-            "capabilities": [],
-        }
-        for provider in PROVIDER_CATALOG
-    ]
+            status=ProviderStatus.PLANNED,
+            enabled=False,
+            integration_mode=IntegrationMode.UNDETERMINED,
+            api_status=VerificationStatus.NOT_VERIFIED,
+            age_policy_status=AgePolicyStatus.NOT_REVIEWED,
+            region_status=VerificationStatus.NOT_VERIFIED,
+        )
+
+        providers.append(
+            provider_info.model_dump(mode="json")
+        )
+
+    return providers
