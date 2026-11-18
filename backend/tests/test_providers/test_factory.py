@@ -51,6 +51,17 @@ def test_factory_uses_default_model_when_not_configured():
     assert provider.model_name == "mock-v1"
 
 
+def test_factory_uses_default_model_when_configured_model_is_empty():
+    settings = ProviderSettings(default_model="   ")
+
+    assert settings.default_model is None
+
+    provider = ProviderFactory.create_mock_provider(settings)
+
+    assert provider.model_name == "mock-v1"
+    assert provider._adapter.model_name == "mock-v1"
+
+
 def test_factory_does_not_require_enabled_configuration_for_internal_mock():
     settings = ProviderSettings(enabled=False)
 
@@ -63,13 +74,6 @@ def test_factory_does_not_require_enabled_configuration_for_internal_mock():
 def test_factory_rejects_invalid_settings():
     with pytest.raises(TypeError, match="ProviderSettings"):
         ProviderFactory.create_mock_provider("invalid")
-
-
-def test_factory_rejects_empty_configured_model():
-    settings = ProviderSettings(default_model="   ")
-
-    with pytest.raises(ValueError, match="Model name"):
-        ProviderFactory.create_mock_provider(settings)
 
 
 def test_factory_passes_timeout_to_adapter_execution():

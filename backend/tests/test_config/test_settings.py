@@ -1,4 +1,3 @@
-
 import pytest
 from pydantic import SecretStr, ValidationError
 
@@ -125,6 +124,89 @@ def test_provider_valid_api_key_is_detected():
     assert config.has_api_key is True
 
 
+def test_provider_base_url_is_normalized():
+    config = ProviderSettings(
+        base_url="  https://api.example.com/v1  "
+    )
+
+    assert config.base_url == "https://api.example.com/v1"
+
+
+def test_provider_base_url_missing():
+    config = ProviderSettings(base_url=None)
+
+    assert config.base_url is None
+
+
+def test_provider_empty_base_url_is_normalized_to_none():
+    config = ProviderSettings(base_url="   ")
+
+    assert config.base_url is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "api.example.com",
+        "/v1",
+        "ftp://api.example.com",
+        "http://api.example.com",
+        "https://",
+        "https://api.example.com/path with spaces",
+        "https://user:password@api.example.com",
+        "https://api.example.com?token=test",
+        "https://api.example.com#fragment",
+    ],
+)
+def test_provider_rejects_invalid_base_url(value):
+    with pytest.raises(ValidationError):
+        ProviderSettings(base_url=value)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://api.example.com",
+        "https://api.example.com/v1",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://[::1]:8000",
+    ],
+)
+def test_provider_accepts_valid_base_url(value):
+    config = ProviderSettings(base_url=value)
+
+    assert config.base_url == value
+
+
+def test_provider_default_model_is_normalized():
+    config = ProviderSettings(default_model="  test-model  ")
+
+    assert config.default_model == "test-model"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        " ",
+        "   ",
+        "\t",
+        "\n",
+    ],
+)
+def test_provider_empty_default_model_is_normalized_to_none(value):
+    config = ProviderSettings(default_model=value)
+
+    assert config.default_model is None
+
+
+def test_provider_missing_default_model():
+    config = ProviderSettings(default_model=None)
+
+    assert config.default_model is None
+
+
 def test_provider_rejects_invalid_timeout():
     with pytest.raises(ValidationError):
         ProviderSettings(timeout=0)
@@ -182,3 +264,32 @@ def test_provider_environment_empty_api_key_is_not_configured(monkeypatch):
 
     assert configs["openai"].api_key is None
     assert configs["openai"].has_api_key is False
+
+
+def test_provider_environment_base_url_is_validated(monkeypatch):
+    monkeypatch.setenv(
+        "AI_UNIVERSE_OPENAI_BASE_URL",
+        "https://api.example.com/v1",
+    )
+
+    configs = load_provider_settings()
+
+    assert configs["openai"].base_url == "https://api.example.com/v1"
+
+
+def test_provider_environment_invalid_base_url_is_rejected(monkeypatch):
+    monkeypatch.setenv(
+        "AI_UNIVERSE_OPENAI_BASE_URL",
+        "http://api.example.com",
+    )
+
+    with pytest.raises(ValidationError):
+        load_provider_settings()
+
+
+def test_provider_environment_empty_model_is_not_configured(monkeypatch):
+    monkeypatch.setenv("AI_UNIVERSE_OPENAI_MODEL", "   ")
+
+    configs = load_provider_settings()
+
+    assert configs["openai"].default_model is None
