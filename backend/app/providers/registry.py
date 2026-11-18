@@ -1,8 +1,7 @@
-
 from app.config.providers import provider_settings as default_provider_settings
 from app.config.settings import ProviderSettings
 from app.providers.base import BaseProvider
-from app.providers.mock_provider import MockProvider
+from app.providers.factory import ProviderFactory
 
 
 class ProviderRegistry:
@@ -48,7 +47,10 @@ class ProviderRegistry:
 
         name = self._validate_name(provider.provider_name)
 
-        if not isinstance(provider.model_name, str) or not provider.model_name.strip():
+        if (
+            not isinstance(provider.model_name, str)
+            or not provider.model_name.strip()
+        ):
             raise ValueError("Provider model name must be a non-empty string.")
 
         if name in self._providers:
@@ -116,4 +118,4 @@ class ProviderRegistry:
 
 
 registry = ProviderRegistry()
-registry.register(MockProvider())
+registry.register(ProviderFactory.create_mock_provider())
