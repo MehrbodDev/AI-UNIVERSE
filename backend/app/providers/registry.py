@@ -72,7 +72,7 @@ class ProviderRegistry:
         Create and register a provider from its configuration.
 
         Configuration alone never causes automatic registration.
-        The provider must be enabled, have an API key, and have a
+        The provider must be enabled, have a valid API key, and have a
         supported implementation in the supplied factory.
         """
 
@@ -94,7 +94,7 @@ class ProviderRegistry:
                 f"Provider '{name}' is disabled in its configuration."
             )
 
-        if config.api_key is None:
+        if not config.has_api_key:
             raise ValueError(
                 f"Provider '{name}' API key is missing."
             )
@@ -158,7 +158,7 @@ class ProviderRegistry:
             {
                 "name": name,
                 "enabled": config.enabled,
-                "has_api_key": config.api_key is not None,
+                "has_api_key": config.has_api_key,
                 "base_url": config.base_url,
                 "default_model": config.default_model,
                 "timeout": config.timeout,

@@ -1,5 +1,6 @@
+
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from app.config.settings import (
     AppSettings,
@@ -78,12 +79,59 @@ def test_provider_api_key_is_masked():
     assert "test-secret-key" not in repr(config)
 
 
+def test_provider_api_key_is_normalized():
+    config = ProviderSettings(api_key="  test-secret-key  ")
+
+    assert config.api_key is not None
+    assert config.api_key.get_secret_value() == "test-secret-key"
+    assert config.has_api_key is True
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        " ",
+        "   ",
+        "\t",
+        "\n",
+        " \t\n ",
+    ],
+)
+def test_provider_empty_api_key_is_normalized_to_none(value):
+    config = ProviderSettings(api_key=value)
+
+    assert config.api_key is None
+    assert config.has_api_key is False
+
+
+def test_provider_secretstr_empty_api_key_is_normalized_to_none():
+    config = ProviderSettings(api_key=SecretStr("   "))
+
+    assert config.api_key is None
+    assert config.has_api_key is False
+
+
+def test_provider_missing_api_key():
+    config = ProviderSettings(api_key=None)
+
+    assert config.api_key is None
+    assert config.has_api_key is False
+
+
+def test_provider_valid_api_key_is_detected():
+    config = ProviderSettings(api_key="valid-test-key")
+
+    assert config.has_api_key is True
+
+
 def test_provider_rejects_invalid_timeout():
     with pytest.raises(ValidationError):
         ProviderSettings(timeout=0)
 
     with pytest.raises(ValidationError):
         ProviderSettings(timeout=301)
+
 
 @pytest.mark.parametrize(
     ("value", "expected"),
@@ -102,7 +150,10 @@ def test_parse_env_bool(value, expected):
     assert parse_env_bool(value, "TEST_VARIABLE") is expected
 
 
-@pytest.mark.parametrize("value", ["yes", "no", "1", "0", "invalid", ""])
+@pytest.mark.parametrize(
+    "value",
+    ["yes", "no", "1", "0", "invalid", ""],
+)
 def test_parse_env_bool_rejects_invalid_values(value):
     from app.config.settings import parse_env_bool
 
@@ -122,3 +173,12 @@ def test_provider_rejects_invalid_enabled_value(monkeypatch):
 
     with pytest.raises(ValueError, match="AI_UNIVERSE_OPENAI_ENABLED"):
         load_provider_settings()
+
+
+def test_provider_environment_empty_api_key_is_not_configured(monkeypatch):
+    monkeypatch.setenv("AI_UNIVERSE_OPENAI_API_KEY", "   ")
+
+    configs = load_provider_settings()
+
+    assert configs["openai"].api_key is None
+    assert configs["openai"].has_api_key is False

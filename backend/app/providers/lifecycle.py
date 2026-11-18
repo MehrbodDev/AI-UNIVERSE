@@ -102,7 +102,7 @@ class ProviderLifecycleManager:
 
         enabled = config.enabled if config is not None else False
         has_api_key = (
-            config.api_key is not None
+            config.has_api_key
             if config is not None
             else False
         )
