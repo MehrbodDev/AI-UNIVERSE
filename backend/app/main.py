@@ -1,8 +1,12 @@
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from app.config.settings import settings
+from app.core.http_client import create_http_client
 from app.providers.catalog import list_provider_catalog
 from app.providers.lifecycle import (
     ProviderLifecycleInfo,
@@ -11,10 +15,27 @@ from app.providers.lifecycle import (
 from app.providers.registry import registry
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application-scoped resources."""
+
+    http_client = create_http_client(
+        timeout=settings.api_timeout,
+    )
+
+    app.state.http_client = http_client
+
+    try:
+        yield
+    finally:
+        await http_client.aclose()
+
+
 app = FastAPI(
     title="AI UNIVERSE API",
     description="Central backend for AI UNIVERSE",
     version="0.4.0",
+    lifespan=lifespan,
 )
 
 
@@ -120,10 +141,10 @@ async def chat(request: ChatRequest):
         raise HTTPException(
             status_code=400,
             detail=str(error),
-        )
+        ) from error
 
     except Exception:
         raise HTTPException(
             status_code=502,
             detail="AI provider error.",
-        )
+        ) from None
