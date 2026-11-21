@@ -1,4 +1,5 @@
-﻿# Python
+﻿
+# Python
 __pycache__/
 *.py[cod]
 .venv/
@@ -31,5 +32,9 @@ Thumbs.db
 # Local data
 storage/backups/
 
+# Test and coverage
 .pytest_cache/
 .coverage
+
+# Local security review (never commit)
+provider_security_review.txt

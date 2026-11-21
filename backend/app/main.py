@@ -1,4 +1,3 @@
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -21,6 +20,7 @@ async def lifespan(app: FastAPI):
 
     http_client = create_http_client(
         timeout=settings.api_timeout,
+        allow_localhost=settings.environment == "development",
     )
 
     app.state.http_client = http_client

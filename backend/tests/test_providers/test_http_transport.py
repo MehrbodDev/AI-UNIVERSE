@@ -63,6 +63,7 @@ def test_http_transport_returns_successful_response():
 
         async with httpx.AsyncClient(
             transport=transport,
+            trust_env=False,
         ) as client:
             adapter = TransportTestAdapter(
                 http_client=client,
@@ -109,6 +110,7 @@ def test_http_transport_maps_status_codes(
 
         async with httpx.AsyncClient(
             transport=transport,
+            trust_env=False,
         ) as client:
             adapter = TransportTestAdapter(
                 http_client=client,
@@ -137,6 +139,7 @@ def test_http_transport_extracts_numeric_retry_after():
 
         async with httpx.AsyncClient(
             transport=transport,
+            trust_env=False,
         ) as client:
             adapter = TransportTestAdapter(
                 http_client=client,
@@ -187,6 +190,7 @@ def test_http_transport_does_not_expose_response_body():
 
         async with httpx.AsyncClient(
             transport=transport,
+            trust_env=False,
         ) as client:
             adapter = TransportTestAdapter(
                 http_client=client,
@@ -225,6 +229,7 @@ def test_http_transport_does_not_follow_redirects():
 
         async with httpx.AsyncClient(
             transport=transport,
+            trust_env=False,
         ) as client:
             adapter = TransportTestAdapter(
                 http_client=client,
@@ -255,6 +260,7 @@ def test_http_transport_maps_connection_errors():
 
         async with httpx.AsyncClient(
             transport=transport,
+            trust_env=False,
         ) as client:
             adapter = TransportTestAdapter(
                 http_client=client,
@@ -291,6 +297,7 @@ def test_http_transport_maps_timeouts():
 
         async with httpx.AsyncClient(
             transport=transport,
+            trust_env=False,
         ) as client:
             adapter = TransportTestAdapter(
                 timeout=0.01,
@@ -349,6 +356,7 @@ def test_http_transport_prevents_redirect_override():
 
         async with httpx.AsyncClient(
             transport=transport,
+            trust_env=False,
         ) as client:
             adapter = TransportTestAdapter(
                 http_client=client,

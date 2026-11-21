@@ -6,6 +6,11 @@ from collections.abc import Awaitable, Callable
 
 import httpx
 
+from app.core.http_client import (
+    get_client_localhost_policy,
+    validate_http_timeout,
+)
+from app.core.network_security import validate_provider_url
 from app.providers.errors import (
     ProviderAuthenticationError,
     ProviderConnectionError,
@@ -28,16 +33,7 @@ class BaseAdapter(ABC):
         timeout: float = 30.0,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
-        if (
-            isinstance(timeout, bool)
-            or not isinstance(timeout, (int, float))
-            or not math.isfinite(timeout)
-            or not 0 < timeout <= 300
-        ):
-            raise ValueError(
-                "Timeout must be a finite number greater than 0 "
-                "and at most 300 seconds."
-            )
+        normalized_timeout = validate_http_timeout(timeout)
 
         if http_client is not None:
             if not isinstance(http_client, httpx.AsyncClient):
@@ -50,12 +46,15 @@ class BaseAdapter(ABC):
                     "HTTP client must be open."
                 )
 
-        self.timeout = float(timeout)
+            get_client_localhost_policy(http_client)
+
+        self.timeout = normalized_timeout
         self._http_client = http_client
 
     @property
     def http_client(self) -> httpx.AsyncClient | None:
         """Return the injected shared HTTP client."""
+
         return self._http_client
 
     @abstractmethod
@@ -64,6 +63,7 @@ class BaseAdapter(ABC):
         request: ProviderRequest,
     ) -> ProviderResponse:
         """Execute a provider-specific request."""
+
         raise NotImplementedError
 
     async def _execute(
@@ -99,8 +99,6 @@ class BaseAdapter(ABC):
                 provider=self.provider_name,
             )
 
-        # Raise outside the exception handler so the original transport
-        # exception is not retained as the new exception's context.
         if mapped_error is not None:
             raise mapped_error
 
@@ -127,9 +125,8 @@ class BaseAdapter(ABC):
         """
         Send an HTTP request using the injected shared client.
 
-        Redirects are disabled to prevent unexpected redirect behavior.
-        Raw HTTP response bodies and transport details are never exposed
-        through standardized provider exceptions.
+        URL validation is performed before the request reaches the transport.
+        Redirects are disabled and raw HTTP error details are not exposed.
         """
 
         if self._http_client is None:
@@ -146,6 +143,15 @@ class BaseAdapter(ABC):
             raise ValueError(
                 "Redirect behavior cannot be overridden by an adapter."
             )
+
+        allow_localhost = get_client_localhost_policy(
+            self._http_client
+        )
+
+        validate_provider_url(
+            url,
+            allow_localhost=allow_localhost,
+        )
 
         response = await self._http_client.request(
             method=method,
@@ -211,7 +217,7 @@ class BaseAdapter(ABC):
 
         try:
             delay = float(value.strip())
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return None
 
         if not math.isfinite(delay) or delay < 0:
