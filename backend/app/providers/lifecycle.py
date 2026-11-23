@@ -182,6 +182,12 @@ class ProviderLifecycleManager:
                 "No provider implementation is currently available.",
             )
 
+        if provider_id != "mock" and not self._registry.has_http_client:
+            return result(
+                ProviderLifecycleStatus.INTEGRATION_UNAVAILABLE,
+                "The shared HTTP client is not initialized.",
+            )
+
         return result(
             ProviderLifecycleStatus.NOT_REGISTERED,
             "Provider is configured but not registered.",
@@ -195,7 +201,7 @@ class ProviderLifecycleManager:
         Activate a provider only after all lifecycle checks pass.
 
         This method does not bypass catalog, policy, configuration,
-        API-key, or factory-support requirements.
+        API-key, factory-support, or shared-client requirements.
         """
 
         current_status = self.get_status(provider_id)

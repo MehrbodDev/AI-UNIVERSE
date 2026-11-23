@@ -1,6 +1,7 @@
 
 import asyncio
 
+import httpx
 import pytest
 
 from app.config.settings import ProviderSettings
@@ -8,6 +9,7 @@ from app.providers.adapters.base import BaseAdapter
 from app.providers.factory import ProviderFactory
 from app.providers.mock_provider import MockProvider
 from app.providers.models import ProviderRequest, ProviderResponse
+from app.providers.openai_provider import OpenAIProvider
 
 
 def test_factory_creates_mock_provider():
@@ -121,10 +123,13 @@ def test_factory_reports_mock_as_supported():
     assert ProviderFactory.supports_provider("mock") is True
 
 
+def test_factory_reports_openai_as_supported():
+    assert ProviderFactory.supports_provider("openai") is True
+
+
 @pytest.mark.parametrize(
     "provider_id",
     [
-        "openai",
         "gemini",
         "claude",
         "unknown",
@@ -132,7 +137,7 @@ def test_factory_reports_mock_as_supported():
         " ",
     ],
 )
-def test_factory_reports_external_providers_as_unsupported(provider_id):
+def test_factory_reports_unsupported_providers(provider_id):
     assert ProviderFactory.supports_provider(provider_id) is False
 
 
@@ -148,7 +153,7 @@ def test_factory_creates_provider_by_id():
 def test_factory_rejects_unsupported_provider_creation():
     with pytest.raises(ValueError, match="No provider implementation"):
         ProviderFactory.create_provider(
-            "openai",
+            "gemini",
             ProviderSettings(),
         )
 
@@ -161,3 +166,118 @@ def test_factory_rejects_invalid_provider_id():
 def test_factory_rejects_provider_id_with_whitespace():
     with pytest.raises(ValueError, match="surrounding whitespace"):
         ProviderFactory.create_provider(" mock ", ProviderSettings())
+
+
+def create_mock_http_client():
+    async def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": "Factory test response",
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+
+    return httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        follow_redirects=False,
+        trust_env=False,
+    )
+
+
+def test_factory_creates_openai_provider_with_shared_http_client():
+    async def run_test():
+        client = create_mock_http_client()
+
+        try:
+            settings = ProviderSettings(
+                enabled=True,
+                api_key="test-openai-key",
+                default_model="factory-openai-model",
+                timeout=20,
+            )
+
+            provider = ProviderFactory.create_provider(
+                "openai",
+                settings,
+                http_client=client,
+            )
+
+            assert isinstance(provider, OpenAIProvider)
+            assert provider.provider_name == "openai"
+            assert provider.model_name == "factory-openai-model"
+            assert provider._adapter.http_client is client
+            assert provider._adapter.timeout == 20.0
+
+            response = await provider.generate(
+                ProviderRequest(message="Factory integration test")
+            )
+
+            assert response.content == "Factory test response"
+            assert response.provider == "openai"
+            assert response.model == "factory-openai-model"
+
+        finally:
+            await client.aclose()
+
+    asyncio.run(run_test())
+
+
+def test_factory_rejects_openai_without_enabled_configuration():
+    settings = ProviderSettings(
+        enabled=False,
+        api_key="test-openai-key",
+    )
+
+    client = create_mock_http_client()
+
+    try:
+        with pytest.raises(ValueError, match="disabled"):
+            ProviderFactory.create_provider(
+                "openai",
+                settings,
+                http_client=client,
+            )
+    finally:
+        asyncio.run(client.aclose())
+
+
+def test_factory_rejects_openai_without_api_key():
+    settings = ProviderSettings(
+        enabled=True,
+        api_key=None,
+    )
+
+    client = create_mock_http_client()
+
+    try:
+        with pytest.raises(ValueError, match="API key"):
+            ProviderFactory.create_provider(
+                "openai",
+                settings,
+                http_client=client,
+            )
+    finally:
+        asyncio.run(client.aclose())
+
+
+def test_factory_rejects_openai_without_shared_http_client():
+    settings = ProviderSettings(
+        enabled=True,
+        api_key="test-openai-key",
+    )
+
+    with pytest.raises(ValueError, match="shared HTTP client"):
+        ProviderFactory.create_provider(
+            "openai",
+            settings,
+        )

@@ -1,4 +1,5 @@
 
+import httpx
 import pytest
 
 from app.config.providers import PROVIDER_IDS
@@ -15,6 +16,32 @@ class DummyProvider(BaseProvider):
 
     async def chat(self, message: str) -> str:
         return message
+
+
+def make_mock_http_client():
+    async def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": "Registry test response",
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+
+    return httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        follow_redirects=False,
+        trust_env=False,
+    )
 
 
 def test_register_provider():
@@ -189,7 +216,7 @@ def test_register_configured_provider_rejects_missing_api_key():
     assert registry.has_provider("mock") is False
 
 
-def test_register_configured_provider_rejects_unsupported_provider():
+def test_register_configured_openai_requires_shared_http_client():
     config = ProviderSettings(
         enabled=True,
         api_key="test-key",
@@ -199,10 +226,86 @@ def test_register_configured_provider_rejects_unsupported_provider():
         provider_configs={"openai": config}
     )
 
-    with pytest.raises(ValueError, match="No provider implementation"):
+    with pytest.raises(ValueError, match="shared HTTP client"):
         registry.register_configured_provider("openai")
 
     assert registry.has_provider("openai") is False
+
+
+def test_register_configured_openai_uses_injected_shared_http_client():
+    async def run_test():
+        config = ProviderSettings(
+            enabled=True,
+            api_key="test-openai-key",
+            default_model="registry-openai-model",
+        )
+
+        client = make_mock_http_client()
+
+        try:
+            registry = ProviderRegistry(
+                provider_configs={"openai": config},
+                http_client=client,
+            )
+
+            provider = registry.register_configured_provider("openai")
+
+            assert provider.provider_name == "openai"
+            assert provider.model_name == "registry-openai-model"
+            assert provider._adapter.http_client is client
+            assert registry.get("openai") is provider
+
+            response = await provider.generate(
+                __import__(
+                    "app.providers.models",
+                    fromlist=["ProviderRequest"],
+                ).ProviderRequest(
+                    message="Registry integration test"
+                )
+            )
+
+            assert response.content == "Registry test response"
+            assert response.provider == "openai"
+
+        finally:
+            await client.aclose()
+
+    import asyncio
+
+    asyncio.run(run_test())
+
+
+def test_registry_shared_http_client_can_be_cleared():
+    client = make_mock_http_client()
+
+    try:
+        registry = ProviderRegistry(http_client=client)
+
+        assert registry.has_http_client is True
+        assert registry.http_client is client
+
+        registry.set_http_client(None)
+
+        assert registry.has_http_client is False
+        assert registry.http_client is None
+
+    finally:
+        import asyncio
+
+        asyncio.run(client.aclose())
+
+
+def test_registry_rejects_closed_http_client():
+    async def run_test():
+        client = make_mock_http_client()
+        await client.aclose()
+
+        with pytest.raises(ValueError, match="must be open"):
+            ProviderRegistry(http_client=client)
+
+    import asyncio
+
+    asyncio.run(run_test())
 
 
 def test_register_configured_provider_rejects_missing_configuration():
@@ -262,3 +365,4 @@ def test_register_configured_provider_rejects_invalid_factory():
 
 def test_factory_import_is_available():
     assert ProviderFactory.supports_provider("mock") is True
+    assert ProviderFactory.supports_provider("openai") is True

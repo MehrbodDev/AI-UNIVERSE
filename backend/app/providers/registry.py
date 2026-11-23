@@ -1,4 +1,6 @@
 
+import httpx
+
 from app.config.providers import provider_settings as default_provider_settings
 from app.config.settings import ProviderSettings
 from app.providers.base import BaseProvider
@@ -6,13 +8,15 @@ from app.providers.factory import ProviderFactory
 
 
 class ProviderRegistry:
-    """Store provider instances and their validated configurations."""
+    """Store provider instances, configurations, and shared resources."""
 
     def __init__(
         self,
         provider_configs: dict[str, ProviderSettings] | None = None,
+        http_client: httpx.AsyncClient | None = None,
     ):
         self._providers: dict[str, BaseProvider] = {}
+        self._http_client: httpx.AsyncClient | None = None
 
         configs = (
             default_provider_settings
@@ -32,6 +36,9 @@ class ProviderRegistry:
 
             self._provider_configs[name] = config
 
+        if http_client is not None:
+            self.set_http_client(http_client)
+
     @staticmethod
     def _validate_name(name: str) -> str:
         if not isinstance(name, str) or not name.strip():
@@ -43,6 +50,51 @@ class ProviderRegistry:
             )
 
         return name
+
+    @property
+    def http_client(self) -> httpx.AsyncClient | None:
+        """Return the application-scoped shared HTTP client."""
+
+        return self._http_client
+
+    @property
+    def has_http_client(self) -> bool:
+        """Return whether an open shared HTTP client is available."""
+
+        return (
+            self._http_client is not None
+            and not self._http_client.is_closed
+        )
+
+    def set_http_client(
+        self,
+        http_client: httpx.AsyncClient | None,
+    ) -> None:
+        """Set or clear the application-scoped shared HTTP client."""
+
+        if http_client is None:
+            self._http_client = None
+            return
+
+        if not isinstance(http_client, httpx.AsyncClient):
+            raise TypeError(
+                "HTTP client must be an httpx.AsyncClient instance."
+            )
+
+        if http_client.is_closed:
+            raise ValueError("HTTP client must be open.")
+
+        self._http_client = http_client
+
+    @staticmethod
+    def _validate_factory(
+        factory: type[ProviderFactory],
+    ) -> None:
+        if not isinstance(factory, type):
+            raise TypeError("Factory must be a ProviderFactory class.")
+
+        if not issubclass(factory, ProviderFactory):
+            raise TypeError("Factory must inherit from ProviderFactory.")
 
     def register(self, provider: BaseProvider) -> None:
         """Register an already-created provider instance."""
@@ -72,17 +124,12 @@ class ProviderRegistry:
         Create and register a provider from its configuration.
 
         Configuration alone never causes automatic registration.
-        The provider must be enabled, have a valid API key, and have a
-        supported implementation in the supplied factory.
+        External providers require an enabled configuration, an API key,
+        a supported implementation, and the shared HTTP client.
         """
 
         name = self._validate_name(name)
-
-        if not isinstance(factory, type):
-            raise TypeError("Factory must be a ProviderFactory class.")
-
-        if not issubclass(factory, ProviderFactory):
-            raise TypeError("Factory must inherit from ProviderFactory.")
+        self._validate_factory(factory)
 
         if name in self._providers:
             raise ValueError(f"Provider '{name}' is already registered.")
@@ -104,7 +151,17 @@ class ProviderRegistry:
                 f"No provider implementation is available for '{name}'."
             )
 
-        provider = factory.create_provider(name, config)
+        if name != "mock" and not self.has_http_client:
+            raise ValueError(
+                "A shared HTTP client must be injected before registering "
+                f"provider '{name}'."
+            )
+
+        provider = factory.create_provider(
+            name,
+            config,
+            http_client=self._http_client,
+        )
 
         if not isinstance(provider, BaseProvider):
             raise TypeError(

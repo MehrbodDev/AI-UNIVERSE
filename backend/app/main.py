@@ -1,3 +1,4 @@
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -26,8 +27,10 @@ async def lifespan(app: FastAPI):
     app.state.http_client = http_client
 
     try:
+        registry.set_http_client(http_client)
         yield
     finally:
+        registry.set_http_client(None)
         await http_client.aclose()
 
 
