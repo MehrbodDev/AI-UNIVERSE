@@ -1,6 +1,7 @@
 
 from fastapi.testclient import TestClient
 
+from app.config.providers import provider_settings
 from app.main import app
 
 
@@ -26,10 +27,13 @@ def test_get_all_provider_lifecycle_statuses():
     assert "gemini" in provider_ids
 
     for provider in data["providers"]:
+        provider_id = provider["provider_id"]
+        config = provider_settings[provider_id]
+
         assert provider["status"] == "planned"
-        assert provider["enabled"] is False
+        assert provider["enabled"] is config.enabled
         assert provider["registered"] is False
-        assert provider["has_api_key"] is False
+        assert provider["has_api_key"] is config.has_api_key
 
         assert "api_key" not in provider
 
@@ -40,12 +44,13 @@ def test_get_single_provider_lifecycle_status():
     assert response.status_code == 200
 
     data = response.json()
+    config = provider_settings["openai"]
 
     assert data["provider_id"] == "openai"
     assert data["status"] == "planned"
-    assert data["enabled"] is False
+    assert data["enabled"] is config.enabled
     assert data["registered"] is False
-    assert data["has_api_key"] is False
+    assert data["has_api_key"] is config.has_api_key
 
     assert "api_key" not in data
 

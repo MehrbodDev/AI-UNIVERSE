@@ -1,9 +1,17 @@
 
 import os
 import ipaddress
+from pathlib import Path
 from urllib.parse import urlsplit
 
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field, SecretStr, field_validator
+
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE = BACKEND_ROOT / ".env"
+
+load_dotenv(dotenv_path=ENV_FILE, override=False)
 
 
 def parse_env_bool(value: str, variable_name: str) -> bool:
