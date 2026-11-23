@@ -1,10 +1,11 @@
+
 # AI UNIVERSE
 
 **Multi-AI Command Center**
 
 AI UNIVERSE is a multi-provider AI workspace in active development. Its goal is to bring supported cloud AI services and AI workflows into one unified interface.
 
-> **Current status:** The dashboard and initial provider architecture exist. The backend currently runs a mock provider only. No real AI provider integration is enabled.
+> **Current status:** The project includes an initial dashboard, provider architecture, shared HTTP client infrastructure, and a security-focused provider transport layer. The backend currently uses a mock provider only. No real AI provider integration is enabled.
 
 ## Project goals
 
@@ -13,6 +14,7 @@ AI UNIVERSE is a multi-provider AI workspace in active development. Its goal is 
 - Research, learning, coding, and knowledge workflows
 - Provider-independent backend architecture
 - Account-level usage limits, cost controls, and privacy safeguards
+- Secure and maintainable communication with external provider APIs
 
 ## Planned provider catalog
 
@@ -36,18 +38,40 @@ These entries are **not active integrations**. API availability, official terms,
 
 ### Backend
 
-- FastAPI application
+The backend is built with FastAPI and currently includes:
+
 - Health endpoint: `GET /api/health`
 - Provider listing: `GET /api/providers`
 - Provider catalog: `GET /api/providers/catalog`
 - Chat endpoint: `POST /api/chat`
-- `BaseProvider` abstract provider contract
-- `ProviderRegistry` for provider registration and lookup
+- Provider abstraction through `BaseProvider`
+- Provider registration and lookup through `ProviderRegistry`
 - `MockProvider` for local architecture testing
-- Pydantic provider schemas
-- Automated provider catalog tests
+- Pydantic-based provider schemas
+- Shared asynchronous HTTP client infrastructure
+- Provider HTTP transport layer
+- Centralized network security configuration and validation
+- Secure transport lifecycle management
+- Automated tests for HTTP client behavior, network security, and provider transport
 
 The chat endpoint currently uses the mock provider. It does not call OpenAI, Gemini, or any other external AI service.
+
+### HTTP and network security
+
+The backend includes shared infrastructure for outbound HTTP communication.
+
+The current implementation focuses on:
+
+- Centralized HTTP client configuration
+- Secure transport configuration and TLS-related validation
+- Timeout configuration validation
+- Consistent provider transport behavior
+- HTTP client lifecycle management
+- Automated security and transport integration tests
+
+The transport infrastructure is intended to provide a consistent foundation for future provider integrations. It does not mean that external providers are currently connected.
+
+Some transport compatibility checks rely on HTTPX and HTTPCore implementation details. Dependency upgrades should therefore be accompanied by compatibility and security test runs.
 
 ### Frontend
 
@@ -62,7 +86,8 @@ The AI workspace modules are interface placeholders unless explicitly stated oth
 ## Technology stack
 
 - **Frontend:** Next.js, React, TypeScript, Tailwind CSS
-- **Backend:** Python, FastAPI, Pydantic, Uvicorn
+- **Backend:** Python, FastAPI, Pydantic, HTTPX, Uvicorn
+- **HTTP transport:** HTTPX and HTTPCore
 - **Testing:** pytest
 - **Tooling:** Git, GitHub, Visual Studio Code
 
@@ -72,30 +97,27 @@ The AI workspace modules are interface placeholders unless explicitly stated oth
 AI-UNIVERSE/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py
+│   │   ├── core/
+│   │   │   ├── http_client.py
+│   │   │   └── network_security.py
+│   │   ├── config/
 │   │   ├── providers/
-│   │   │   ├── base.py
-│   │   │   ├── catalog.py
-│   │   │   ├── mock_provider.py
-│   │   │   └── registry.py
-│   │   └── schemas/
-│   │       └── provider.py
+│   │   │   └── adapters/
+│   │   ├── schemas/
+│   │   └── main.py
 │   ├── tests/
+│   │   ├── test_core/
 │   │   └── test_providers/
-│   │       └── test_catalog.py
 │   ├── requirements.txt
 │   └── requirements-dev.txt
 ├── frontend/
 │   ├── public/
 │   ├── src/
 │   │   └── app/
-│   │       ├── globals.css
-│   │       ├── icon.svg
-│   │       ├── layout.tsx
-│   │       └── page.tsx
 │   ├── package.json
 │   ├── package-lock.json
 │   └── next.config.ts
+├── .gitattributes
 ├── .gitignore
 └── README.md
 ```
@@ -129,14 +151,21 @@ Frontend: `http://localhost:3000`
 
 ## Tests and quality checks
 
-Backend tests:
+### Backend tests
 
 ```powershell
 cd "$HOME\AI-UNIVERSE\backend"
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-Frontend checks:
+### Backend dependency validation
+
+```powershell
+cd "$HOME\AI-UNIVERSE\backend"
+.\.venv\Scripts\python.exe -m pip check
+```
+
+### Frontend checks
 
 ```powershell
 cd "$HOME\AI-UNIVERSE\frontend"
@@ -149,6 +178,9 @@ npm run build
 - Keep provider API keys on the backend only.
 - Never commit `.env` files, credentials, or tokens.
 - Do not expose secrets in frontend code or browser responses.
+- Verify TLS certificates for external HTTPS connections.
+- Use explicit and validated timeout settings for outbound requests.
+- Manage shared HTTP clients through their intended application lifecycle.
 - Integrate providers only through authorized official APIs or permitted official workspaces.
 - Respect provider terms, age requirements, regional restrictions, and licensing.
 - Apply authentication, per-user quotas, rate limits, and cost controls before public production use.
@@ -157,9 +189,28 @@ npm run build
 
 ## Development status
 
-Implemented: initial frontend dashboard, backend health endpoint, provider abstraction, provider registry, mock provider, provider catalog metadata, and catalog tests.
+### Implemented
 
-Not yet implemented: real provider API integrations, production authentication, user-specific quotas, persistent chat history, model routing, multi-model orchestration, and production deployment.
+- Initial frontend dashboard
+- Backend health endpoint
+- Provider abstraction and registry
+- Mock provider
+- Provider catalog metadata
+- Shared HTTP client infrastructure
+- Provider HTTP transport layer
+- Network security configuration and validation
+- HTTP client lifecycle management
+- Automated backend tests for provider, HTTP client, and network security components
+
+### Not yet implemented
+
+- Real provider API integrations
+- Production authentication
+- User-specific quotas
+- Persistent chat history
+- Model routing
+- Multi-model orchestration
+- Production deployment
 
 ## Project
 
