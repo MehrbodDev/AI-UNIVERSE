@@ -1,4 +1,7 @@
 
+import asyncio
+
+import httpx
 import pytest
 
 from app.config.settings import ProviderSettings
@@ -33,6 +36,14 @@ def make_catalog_entry(**overrides):
     return entry
 
 
+class DummyProvider(BaseProvider):
+    provider_name = "openai"
+    model_name = "test-model"
+
+    async def chat(self, message: str) -> str:
+        return f"Test response: {message}"
+
+
 def make_registry(
     enabled=True,
     api_key="test-api-key",
@@ -53,12 +64,15 @@ def make_registry(
     return registry
 
 
-class DummyProvider(BaseProvider):
-    provider_name = "openai"
-    model_name = "test-model"
+def make_mock_http_client():
+    async def handler(request):
+        return httpx.Response(200, json={"ok": True})
 
-    async def chat(self, message: str) -> str:
-        return f"Test response: {message}"
+    return httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        follow_redirects=False,
+        trust_env=False,
+    )
 
 
 def test_default_catalog_provider_is_planned():
@@ -172,7 +186,7 @@ def test_provider_without_implementation_is_integration_unavailable():
     assert result.registered is False
 
 
-def test_provider_ready_when_all_conditions_are_met():
+def test_registered_provider_without_http_client_is_integration_unavailable():
     registry = make_registry(
         enabled=True,
         api_key="test-api-key",
@@ -183,10 +197,34 @@ def test_provider_ready_when_all_conditions_are_met():
 
     result = manager.get_status("openai")
 
-    assert result.status == ProviderLifecycleStatus.READY
-    assert result.enabled is True
+    assert result.status == ProviderLifecycleStatus.INTEGRATION_UNAVAILABLE
     assert result.registered is True
+    assert result.enabled is True
     assert result.has_api_key is True
+
+
+def test_provider_ready_when_all_conditions_are_met():
+    async def run_test():
+        async with make_mock_http_client() as client:
+            registry = make_registry(
+                enabled=True,
+                api_key="test-api-key",
+            )
+
+            registry.set_http_client(client)
+            registry.register(DummyProvider())
+
+            catalog = [make_catalog_entry()]
+            manager = ProviderLifecycleManager(registry, catalog)
+
+            result = manager.get_status("openai")
+
+            assert result.status == ProviderLifecycleStatus.READY
+            assert result.enabled is True
+            assert result.registered is True
+            assert result.has_api_key is True
+
+    asyncio.run(run_test())
 
 
 def test_list_statuses_returns_all_catalog_providers():

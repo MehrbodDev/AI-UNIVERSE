@@ -1,4 +1,3 @@
-
 from enum import Enum
 
 from pydantic import BaseModel
@@ -170,12 +169,6 @@ class ProviderLifecycleManager:
                 "Provider API key is missing.",
             )
 
-        if registered:
-            return result(
-                ProviderLifecycleStatus.READY,
-                "Provider passed all internal readiness checks.",
-            )
-
         if not self._factory.supports_provider(provider_id):
             return result(
                 ProviderLifecycleStatus.INTEGRATION_UNAVAILABLE,
@@ -186,6 +179,12 @@ class ProviderLifecycleManager:
             return result(
                 ProviderLifecycleStatus.INTEGRATION_UNAVAILABLE,
                 "The shared HTTP client is not initialized.",
+            )
+
+        if registered:
+            return result(
+                ProviderLifecycleStatus.READY,
+                "Provider passed all internal readiness checks.",
             )
 
         return result(

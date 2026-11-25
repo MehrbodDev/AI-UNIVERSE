@@ -66,24 +66,53 @@ class ProviderRegistry:
             and not self._http_client.is_closed
         )
 
+    def _clear_application_scoped_providers(self) -> None:
+        """
+        Remove providers that may retain application-scoped resources.
+
+        The mock provider is independent of the shared HTTP client and
+        therefore survives application shutdown and client replacement.
+        """
+
+        provider_names = [
+            name
+            for name in self._providers
+            if name != "mock"
+        ]
+
+        for name in provider_names:
+            self.unregister(name)
+
     def set_http_client(
         self,
         http_client: httpx.AsyncClient | None,
     ) -> None:
-        """Set or clear the application-scoped shared HTTP client."""
+        """
+        Set or clear the application-scoped shared HTTP client.
 
-        if http_client is None:
-            self._http_client = None
+        External providers are removed whenever their shared client is
+        cleared or replaced. Passing the same client instance preserves
+        the providers that already use it.
+        """
+
+        if http_client is not None:
+            if not isinstance(http_client, httpx.AsyncClient):
+                raise TypeError(
+                    "HTTP client must be an httpx.AsyncClient instance."
+                )
+
+            if http_client.is_closed:
+                raise ValueError("HTTP client must be open.")
+
+        # Preserve providers only when the same non-None client is reused.
+        # Clearing with None must always trigger provider cleanup.
+        if (
+            http_client is not None
+            and http_client is self._http_client
+        ):
             return
 
-        if not isinstance(http_client, httpx.AsyncClient):
-            raise TypeError(
-                "HTTP client must be an httpx.AsyncClient instance."
-            )
-
-        if http_client.is_closed:
-            raise ValueError("HTTP client must be open.")
-
+        self._clear_application_scoped_providers()
         self._http_client = http_client
 
     @staticmethod
