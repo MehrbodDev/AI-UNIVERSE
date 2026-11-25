@@ -1,13 +1,23 @@
 
 from contextlib import asynccontextmanager
+import math
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.config.settings import settings
 from app.core.http_client import create_http_client
 from app.providers.catalog import list_provider_catalog
+from app.providers.errors import (
+    ProviderAuthenticationError,
+    ProviderConnectionError,
+    ProviderError,
+    ProviderRateLimitError,
+    ProviderResponseError,
+    ProviderTimeoutError,
+)
 from app.providers.lifecycle import (
     ProviderLifecycleInfo,
     ProviderLifecycleManager,
@@ -63,6 +73,61 @@ class ChatResponse(BaseModel):
     reply: str
     provider: str
     model: str
+
+
+def create_provider_error_response(
+    error: ProviderError,
+) -> JSONResponse:
+    """Convert provider exceptions into safe, structured API errors."""
+
+    if isinstance(error, ProviderAuthenticationError):
+        status_code = 502
+        error_code = "provider_authentication_failed"
+        message = "Provider authentication failed."
+
+    elif isinstance(error, ProviderRateLimitError):
+        status_code = 429
+        error_code = "provider_rate_limit"
+        message = "Provider rate limit was reached."
+
+    elif isinstance(error, ProviderTimeoutError):
+        status_code = 504
+        error_code = "provider_timeout"
+        message = "Provider request timed out."
+
+    elif isinstance(error, ProviderConnectionError):
+        status_code = 503
+        error_code = "provider_connection_failed"
+        message = "Provider connection failed."
+
+    elif isinstance(error, ProviderResponseError):
+        status_code = 502
+        error_code = "provider_invalid_response"
+        message = "Provider returned an invalid response."
+
+    else:
+        status_code = 502
+        error_code = "provider_error"
+        message = "AI provider error."
+
+    error_data = {
+        "code": error_code,
+        "message": message,
+        "provider": error.provider,
+        "retryable": error.retryable,
+        "retry_after": error.retry_after,
+    }
+
+    headers = {}
+
+    if error.retry_after is not None:
+        headers["Retry-After"] = str(math.ceil(error.retry_after))
+
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": error_data},
+        headers=headers,
+    )
 
 
 @app.get("/")
@@ -145,6 +210,9 @@ async def chat(request: ChatRequest):
             status_code=400,
             detail=str(error),
         ) from error
+
+    except ProviderError as error:
+        return create_provider_error_response(error)
 
     except Exception:
         raise HTTPException(
