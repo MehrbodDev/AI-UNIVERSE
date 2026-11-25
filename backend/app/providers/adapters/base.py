@@ -3,6 +3,8 @@ import asyncio
 import math
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 import httpx
 
@@ -210,17 +212,50 @@ class BaseAdapter(ABC):
     def _parse_retry_after(
         value: str | None,
     ) -> float | None:
-        """Parse a numeric Retry-After value safely."""
+        """
+        Parse Retry-After as delta-seconds or an HTTP date.
+
+        Invalid, non-finite, or negative numeric values are rejected.
+        Past HTTP dates produce a zero-second delay.
+        """
 
         if value is None:
             return None
 
+        normalized_value = value.strip()
+
+        if not normalized_value:
+            return None
+
         try:
-            delay = float(value.strip())
+            delay = float(normalized_value)
         except (TypeError, ValueError, OverflowError):
+            delay = None
+
+        if delay is not None:
+            if not math.isfinite(delay) or delay < 0:
+                return None
+
+            return delay
+
+        try:
+            retry_at = parsedate_to_datetime(normalized_value)
+
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=timezone.utc)
+
+            now = datetime.now(timezone.utc)
+            delay = (retry_at - now).total_seconds()
+
+        except (
+            TypeError,
+            ValueError,
+            OverflowError,
+            IndexError,
+        ):
             return None
 
-        if not math.isfinite(delay) or delay < 0:
+        if not math.isfinite(delay):
             return None
 
-        return delay
+        return max(0.0, delay)

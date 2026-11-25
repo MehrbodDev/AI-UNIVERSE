@@ -1,5 +1,7 @@
 
 import asyncio
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 
 import httpx
 import pytest
@@ -157,14 +159,68 @@ def test_http_transport_extracts_numeric_retry_after():
     asyncio.run(run_test())
 
 
+def test_http_transport_extracts_http_date_retry_after():
+    async def run_test():
+        retry_at = datetime.now(timezone.utc) + timedelta(
+            seconds=120
+        )
+        retry_after = format_datetime(
+            retry_at,
+            usegmt=True,
+        )
+
+        async def handler(request):
+            return httpx.Response(
+                429,
+                headers={"Retry-After": retry_after},
+            )
+
+        transport = httpx.MockTransport(handler)
+
+        async with httpx.AsyncClient(
+            transport=transport,
+            trust_env=False,
+        ) as client:
+            adapter = TransportTestAdapter(
+                http_client=client,
+            )
+
+            with pytest.raises(
+                ProviderRateLimitError,
+            ) as exc_info:
+                await adapter.generate(
+                    ProviderRequest(message="Hello")
+                )
+
+            assert exc_info.value.retry_after is not None
+            assert 100 <= exc_info.value.retry_after <= 120
+
+    asyncio.run(run_test())
+
+
+def test_http_transport_returns_zero_for_past_retry_after_date():
+    past_date = format_datetime(
+        datetime.now(timezone.utc) - timedelta(seconds=60),
+        usegmt=True,
+    )
+
+    delay = TransportTestAdapter._parse_retry_after(
+        past_date
+    )
+
+    assert delay == 0.0
+
+
 @pytest.mark.parametrize(
     "retry_after",
     [
         None,
+        "",
         "invalid",
         "-5",
         "inf",
         "nan",
+        "not-a-valid-http-date",
     ],
 )
 def test_http_transport_rejects_invalid_retry_after(
