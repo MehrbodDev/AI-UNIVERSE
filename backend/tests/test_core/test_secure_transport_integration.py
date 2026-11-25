@@ -1,3 +1,4 @@
+
 import asyncio
 import socket
 import ssl
@@ -240,7 +241,7 @@ async def perform_tls_request(
                 )
             )
 
-            if host != "localhost":
+            if host not in {"localhost", "127.0.0.1"}:
                 raise OSError("Unexpected test hostname.")
 
             return [
@@ -378,9 +379,6 @@ def test_secure_transport_rejects_untrusted_certificate(
                 key_path=key_path,
             )
 
-        # The factory was called once by perform_tls_request.
-        # Its actual context is verified by the transport itself.
-
     asyncio.run(run_test())
 
 
@@ -391,9 +389,7 @@ def test_secure_transport_rejects_hostname_mismatch(
     cert_path, key_path = tls_test_material
 
     async def run_test():
-        result_holder = {}
-
-        with pytest.raises(httpx.ConnectError):
+        with pytest.raises(httpx.ConnectError) as exc_info:
             await perform_tls_request(
                 monkeypatch,
                 cert_path=cert_path,
@@ -401,5 +397,13 @@ def test_secure_transport_rejects_hostname_mismatch(
                 trusted_certificate=cert_path,
                 hostname="127.0.0.1",
             )
+
+        error_message = str(exc_info.value).lower()
+
+        assert "certificate verify failed" in error_message
+        assert (
+            "ip address mismatch" in error_message
+            or "not valid for" in error_message
+        )
 
     asyncio.run(run_test())
