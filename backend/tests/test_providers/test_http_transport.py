@@ -42,6 +42,18 @@ class TransportTestAdapter(BaseAdapter):
         return await self._execute(operation)
 
 
+@pytest.fixture(autouse=True)
+def disable_retry_sleep(monkeypatch):
+    async def no_sleep(delay: float) -> None:
+        return None
+
+    monkeypatch.setattr(
+        BaseAdapter,
+        "_sleep",
+        staticmethod(no_sleep),
+    )
+
+
 def run_adapter(
     adapter: TransportTestAdapter,
     message: str = "Hello",
