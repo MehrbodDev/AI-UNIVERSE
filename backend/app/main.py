@@ -1,11 +1,13 @@
 
-from contextlib import asynccontextmanager
+import asyncio
 import math
+from contextlib import asynccontextmanager
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.config.settings import settings
 from app.core.http_client import create_http_client
@@ -22,6 +24,7 @@ from app.providers.lifecycle import (
     ProviderLifecycleInfo,
     ProviderLifecycleManager,
 )
+from app.providers.models import ProviderRequest, ProviderResponse
 from app.providers.registry import registry
 
 
@@ -73,6 +76,107 @@ class ChatResponse(BaseModel):
     reply: str
     provider: str
     model: str
+
+
+class MultiChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=10000)
+    providers: list[str] = Field(min_length=2, max_length=5)
+
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, value: str) -> str:
+        normalized = value.strip()
+
+        if not normalized:
+            raise ValueError("Message cannot be empty.")
+
+        return normalized
+
+    @field_validator("providers")
+    @classmethod
+    def validate_providers(cls, value: list[str]) -> list[str]:
+        normalized: list[str] = []
+
+        for provider in value:
+            if not isinstance(provider, str) or not provider.strip():
+                raise ValueError(
+                    "Provider names must be non-empty strings."
+                )
+
+            provider_name = provider.strip()
+
+            if provider_name != provider:
+                raise ValueError(
+                    "Provider names cannot contain surrounding whitespace."
+                )
+
+            if provider_name in normalized:
+                raise ValueError(
+                    "Duplicate providers are not allowed."
+                )
+
+            normalized.append(provider_name)
+
+        return normalized
+
+
+class MultiChatError(BaseModel):
+    code: str
+    message: str
+    retryable: bool = False
+    retry_after: float | None = None
+
+
+class MultiChatResult(BaseModel):
+    provider: str
+    model: str | None = None
+    status: Literal["success", "error"]
+    reply: str | None = None
+    error: MultiChatError | None = None
+
+
+class MultiChatResponse(BaseModel):
+    results: list[MultiChatResult]
+    total: int
+    succeeded: int
+    failed: int
+
+
+def get_provider_error_details(
+    error: ProviderError,
+) -> MultiChatError:
+    """Convert provider exceptions into safe, structured error details."""
+
+    if isinstance(error, ProviderAuthenticationError):
+        code = "provider_authentication_failed"
+        message = "Provider authentication failed."
+
+    elif isinstance(error, ProviderRateLimitError):
+        code = "provider_rate_limit"
+        message = "Provider rate limit was reached."
+
+    elif isinstance(error, ProviderTimeoutError):
+        code = "provider_timeout"
+        message = "Provider request timed out."
+
+    elif isinstance(error, ProviderConnectionError):
+        code = "provider_connection_failed"
+        message = "Provider connection failed."
+
+    elif isinstance(error, ProviderResponseError):
+        code = "provider_invalid_response"
+        message = "Provider returned an invalid response."
+
+    else:
+        code = "provider_error"
+        message = "AI provider error."
+
+    return MultiChatError(
+        code=code,
+        message=message,
+        retryable=error.retryable,
+        retry_after=error.retry_after,
+    )
 
 
 def create_provider_error_response(
@@ -128,6 +232,69 @@ def create_provider_error_response(
         content={"error": error_data},
         headers=headers,
     )
+
+
+async def execute_provider_request(
+    provider_name: str,
+    message: str,
+) -> MultiChatResult:
+    """Execute one provider request and isolate its failures."""
+
+    try:
+        provider = registry.get(provider_name)
+
+    except ValueError:
+        return MultiChatResult(
+            provider=provider_name,
+            status="error",
+            error=MultiChatError(
+                code="provider_not_registered",
+                message="Provider is not registered or available.",
+            ),
+        )
+
+    try:
+        response = await provider.generate(
+            ProviderRequest(message=message)
+        )
+
+        if not isinstance(response, ProviderResponse):
+            raise ProviderResponseError(
+                "Provider returned an invalid response type.",
+                provider=provider_name,
+            )
+
+        if response.provider != provider.provider_name:
+            raise ProviderResponseError(
+                "Provider response identity does not match.",
+                provider=provider_name,
+            )
+
+        return MultiChatResult(
+            provider=response.provider,
+            model=response.model,
+            status="success",
+            reply=response.content,
+        )
+
+    except ProviderError as error:
+        return MultiChatResult(
+            provider=provider_name,
+            model=provider.model_name,
+            status="error",
+            error=get_provider_error_details(error),
+        )
+
+    except Exception:
+        return MultiChatResult(
+            provider=provider_name,
+            model=provider.model_name,
+            status="error",
+            error=MultiChatError(
+                code="provider_internal_error",
+                message="An unexpected provider error occurred.",
+            ),
+        )
 
 
 @app.get("/")
@@ -219,3 +386,35 @@ async def chat(request: ChatRequest):
             status_code=502,
             detail="AI provider error.",
         ) from None
+
+
+@app.post(
+    "/api/chat/multi",
+    response_model=MultiChatResponse,
+)
+async def multi_chat(request: MultiChatRequest):
+    """Send one message to multiple providers concurrently."""
+
+    tasks = [
+        execute_provider_request(
+            provider_name=provider_name,
+            message=request.message,
+        )
+        for provider_name in request.providers
+    ]
+
+    results = await asyncio.gather(*tasks)
+
+    succeeded = sum(
+        result.status == "success"
+        for result in results
+    )
+
+    failed = len(results) - succeeded
+
+    return MultiChatResponse(
+        results=results,
+        total=len(results),
+        succeeded=succeeded,
+        failed=failed,
+    )
