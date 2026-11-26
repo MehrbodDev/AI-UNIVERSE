@@ -4,7 +4,7 @@
 
 AI UNIVERSE is a multi-provider AI workspace designed to bring supported AI services into one unified interface. The project focuses on provider-independent architecture, concurrent model requests, independent response handling, and secure API communication.
 
-> **Development status:** AI UNIVERSE is under active development. The backend includes a working provider registry and lifecycle system, concurrent multi-provider orchestration, a Mock provider, and an implemented OpenAI adapter. The Mock provider is currently the only registered runtime provider. External provider activation and integration verification are postponed.
+> **Development status:** The initial three implementation stages are complete. The backend includes a provider registry and lifecycle system, concurrent multi-provider orchestration, a Mock provider, and an implemented OpenAI adapter. The frontend includes a multi-provider selection and response-comparison interface. The Mock provider is currently the only registered runtime provider. External provider activation and integration verification are postponed. End-to-end validation and production-readiness work remain before a public beta.
 
 ## Project goals
 
@@ -37,11 +37,11 @@ Every provider must pass technical, API availability, regional, licensing, age-p
 
 ### Current provider status
 
-| Provider           | Implementation                  | Runtime status                       |
-| ------------------ | ------------------------------- | ------------------------------------ |
-| Mock               | Implemented                     | Registered and available for testing |
-| OpenAI API         | Adapter and factory implemented | Not registered                       |
-| Other 10 providers | Planned                         | Not implemented                      |
+| Provider | Implementation | Runtime status |
+|---|---|---|
+| Mock | Implemented | Registered and available for testing |
+| OpenAI API | Adapter and factory implemented | Not registered |
+| Other 10 providers | Planned | Not implemented |
 
 The project currently uses Mock for multi-provider orchestration testing. External provider activation and integration verification are postponed.
 
@@ -164,28 +164,26 @@ The frontend is built using:
 - TypeScript
 - Tailwind CSS
 
-The current frontend includes an initial multi-provider testing interface.
+The current frontend includes a multi-provider testing and response-comparison interface.
 
-Current functionality includes:
+Implemented functionality includes:
 
-- Provider availability information
-- Provider selection
-- Selection of 2 to 5 providers
-- Backend API communication
-- Multi-provider test workflow
+- Provider catalog, lifecycle, and registration information
+- Provider selection with a minimum of 2 and a maximum of 5 providers
+- Concurrent multi-provider request submission
+- Independent provider response cards
+- Per-provider success and failure status
+- Structured error information, including retry metadata when available
+- Loading and request-state handling
+- Chat history within the current page session
+- Clear-chat control
+- Validation of provider metadata and multi-provider API responses
+
+Providers that are listed but not registered can be selected to exercise orchestration and error-isolation behavior. They do not produce real AI responses unless they are implemented, configured, and registered.
 
 The frontend currently reflects the backend runtime state: Mock is available, while external providers remain planned or inactive.
 
-Further frontend work includes:
-
-- Improved comparison interface
-- Independent provider response presentation
-- Success and failure status display
-- Structured error information
-- Loading and request-state handling
-- Chat history controls
-
-Frontend functionality must be fully verified before the project is considered ready for public beta.
+Automated frontend checks have passed. Manual end-to-end verification remains part of the pre-beta validation work.
 
 ## Technology stack
 
@@ -343,6 +341,8 @@ npm run lint
 npm run build
 ```
 
+The TypeScript check, ESLint, and production build completed successfully during the latest frontend validation.
+
 ## Security and usage principles
 
 - Keep provider API keys on the backend only.
@@ -377,7 +377,7 @@ Provider-specific age requirements and regional restrictions must also be respec
 
 **Status: Completed.**
 
-### Stage 2 — Multi-Provider Orchestration
+### Stage 2 — Multi-Provider Backend Orchestration
 
 - Implement concurrent multi-provider requests.
 - Support 2 to 5 providers per request.
@@ -389,31 +389,33 @@ Provider-specific age requirements and regional restrictions must also be respec
 
 **Status: Completed.**
 
-### Stage 3 — Frontend Comparison UI and MVP Validation
+### Stage 3 — Frontend Comparison UI and Automated MVP Validation
 
-- Complete the multi-provider comparison interface.
-- Improve independent response presentation.
-- Improve loading and error states.
-- Verify frontend and backend integration.
-- Complete frontend quality checks.
-- Perform end-to-end MVP validation.
-- Review production safeguards before considering a public beta.
+- Implement the multi-provider comparison interface.
+- Present independent provider responses.
+- Display loading, success, and error states.
+- Validate frontend and backend API integration.
+- Complete frontend TypeScript, lint, and production-build checks.
+- Validate provider selection and response parsing.
 
-**Status: In progress.**
+**Status: Implementation completed.**
+
+Manual end-to-end testing and production-readiness checks remain outstanding before a public beta can be considered.
 
 ### Future development
 
+- Perform manual end-to-end testing across the frontend and backend.
+- Review authentication and access-control requirements.
+- Review rate limits, per-user quotas, and cost controls.
+- Complete privacy, security, age, licensing, and regional-policy reviews.
 - Verify official API availability and requirements.
-- Complete authorization and policy checks.
 - Activate eligible external providers when integration work resumes.
 - Test multi-provider requests with real services.
-- Implement production authentication.
-- Introduce user-specific quotas and cost controls.
 - Implement persistent chat history.
 - Prepare production deployment.
 - Conduct a public beta readiness review.
 
-External provider activation is intentionally postponed and is not a requirement for completing the current three development stages.
+External provider activation is intentionally postponed and is not a requirement for completing the current three implementation stages.
 
 ## Project information
 
