@@ -2,48 +2,50 @@
 
 **Multi-AI Command Center**
 
-AI UNIVERSE is a multi-provider AI workspace in active development. Its goal is to bring supported AI services and AI workflows into one unified interface.
+AI UNIVERSE is a multi-provider AI workspace designed to bring supported AI services into one unified interface. The project focuses on provider-independent architecture, concurrent model requests, independent response handling, and secure API communication.
 
-> **Current status:** The project includes a working multi-provider orchestration endpoint, a frontend multi-provider chat interface, a Mock provider, and an OpenAI adapter implementation. The OpenAI integration is not yet approved for production activation. The current active provider registry contains Mock only.
+> **Development status:** AI UNIVERSE is under active development. The backend includes a working provider registry and lifecycle system, concurrent multi-provider orchestration, a Mock provider, and an implemented OpenAI adapter. The Mock provider is currently the only registered runtime provider. External provider activation and integration verification are postponed.
 
 ## Project goals
 
-- A unified workspace for supported AI services
-- Compare model responses through an AI Arena
-- Research, learning, coding, and knowledge workflows
-- Provider-independent backend architecture
-- Account-level usage limits, cost controls, and privacy safeguards
-- Secure and maintainable communication with external provider APIs
+- Provide a unified workspace for supported AI services.
+- Compare responses from different AI models.
+- Support concurrent requests to multiple providers.
+- Build a provider-independent backend architecture.
+- Provide secure and maintainable communication with external APIs.
+- Introduce usage limits, cost controls, and privacy safeguards before public deployment.
 
 ## Provider catalog
 
-The project tracks these 11 planned providers:
+AI UNIVERSE currently tracks the following 11 planned external providers:
 
-1. OpenAI — ChatGPT
-2. Google — Gemini
-3. xAI — Grok
-4. Microsoft — Copilot
+1. OpenAI
+2. Google Gemini
+3. xAI Grok
+4. Microsoft Copilot
 5. DeepSeek
-6. Alibaba — Qwen
-7. Anthropic — Claude
-8. Z.ai — GLM
-9. Moonshot AI — Kimi
+6. Alibaba Qwen
+7. Anthropic Claude
+8. Z.ai GLM
+9. Moonshot AI Kimi
 10. Mistral AI
 11. Perplexity
 
-These catalog entries do not automatically represent active integrations.
+The provider catalog represents planned integrations, not active connections.
 
-Each provider must pass the required technical, API availability, regional, licensing, age-policy, and authorization checks before activation.
+Every provider must pass technical, API availability, regional, licensing, age-policy, and authorization checks before activation.
 
 ### Current provider status
 
-| Provider           | Implementation                  | Runtime status            |
-| ------------------ | ------------------------------- | ------------------------- |
-| Mock               | Implemented                     | Registered                |
-| OpenAI             | Adapter and factory implemented | Pending activation review |
-| Other 10 providers | Planned                         | Not implemented           |
+| Provider           | Implementation                  | Runtime status                       |
+| ------------------ | ------------------------------- | ------------------------------------ |
+| Mock               | Implemented                     | Registered and available for testing |
+| OpenAI API         | Adapter and factory implemented | Not registered                       |
+| Other 10 providers | Planned                         | Not implemented                      |
 
-Only one real provider is currently under implementation review: OpenAI.
+The project currently uses Mock for multi-provider orchestration testing. External provider activation and integration verification are postponed.
+
+A provider listed in the catalog is not necessarily connected or operational.
 
 ## Current implementation
 
@@ -51,6 +53,7 @@ Only one real provider is currently under implementation review: OpenAI.
 
 The backend is built with FastAPI and includes:
 
+- `GET /` — Backend root and version information
 - `GET /api/health` — Backend health check
 - `GET /api/providers` — Registered providers
 - `GET /api/providers/catalog` — Provider catalog
@@ -58,20 +61,34 @@ The backend is built with FastAPI and includes:
 - `POST /api/chat` — Single-provider chat
 - `POST /api/chat/multi` — Concurrent multi-provider chat
 
-The provider architecture includes:
+The backend architecture includes:
 
 - Provider abstraction through `BaseProvider`
 - Provider registration and lookup through `ProviderRegistry`
 - Provider creation through `ProviderFactory`
 - Provider lifecycle validation
-- Pydantic-based provider schemas
-- Independent result and error handling for multi-provider requests
+- Pydantic-based request and response schemas
+- Independent result and error handling
 - Shared asynchronous HTTP client infrastructure
-- Centralized network security configuration and validation
+- Centralized network security configuration
+- Structured provider error handling
+
+### Provider registry and lifecycle
+
+The provider registry and lifecycle system supports:
+
+- Provider registration and lookup
+- Provider configuration validation
+- Provider availability checks
+- Runtime lifecycle status reporting
+- Separation between catalog entries and registered providers
+- Mock provider registration without external API credentials
+
+The Mock provider is currently the only registered runtime provider.
 
 ### Multi-provider orchestration
 
-The multi-chat endpoint supports requests to between 2 and 5 providers.
+The multi-chat endpoint accepts requests targeting between 2 and 5 providers.
 
 Example request:
 
@@ -82,24 +99,28 @@ Example request:
 }
 ```
 
+This example demonstrates the request format. Both providers must be registered and available for successful execution.
+
 The backend:
 
-- Runs provider requests concurrently
-- Keeps each provider result independent
-- Reports successful and failed requests separately
-- Returns provider and model information
-- Provides structured error information
-- Prevents one provider failure from hiding other provider results
+- Runs provider requests concurrently.
+- Keeps each provider result independent.
+- Reports successful and failed requests separately.
+- Returns provider and model information.
+- Provides structured error information.
+- Handles unregistered providers.
+- Handles invalid provider responses.
+- Isolates unexpected provider exceptions.
+- Prevents one provider failure from hiding other results.
+- Preserves compatibility with the existing single-provider chat endpoint.
 
-A provider must be registered and available at runtime to produce a successful response.
-
-The existence of a provider in the catalog does not mean that it is connected.
+The endpoint supports a maximum of five providers per request.
 
 ### OpenAI integration
 
 The project contains an OpenAI adapter based on the official Responses API.
 
-Implementation includes:
+Implemented capabilities include:
 
 - Configurable API key
 - Configurable model
@@ -108,52 +129,63 @@ Implementation includes:
 - Shared HTTP client injection
 - Response parsing and validation
 - Provider-specific error handling
-- No API key exposure through frontend configuration
+- Secure handling of API credentials
+- `store: false` in Responses API requests
 
-The adapter implementation is present, but the provider remains subject to lifecycle, policy, authorization, and integration verification.
+The adapter and factory are implemented, but OpenAI is not currently registered in the active provider registry.
 
-The current provider registry does not automatically register OpenAI merely because its environment configuration is present.
+External API activation and integration verification are postponed.
 
 ### HTTP and network security
 
 The backend includes shared infrastructure for outbound HTTP communication.
 
-The implementation focuses on:
+Current implementation focuses on:
 
 - Centralized HTTP client configuration
 - TLS certificate verification
 - Hostname validation
+- DNS validation and secure transport controls
 - Timeout configuration validation
 - Consistent provider transport behavior
 - HTTP client lifecycle management
+- Restricted redirect behavior
+- Controlled retry handling
 - Automated security and transport integration tests
 
 Dependency upgrades should be accompanied by compatibility and security test runs.
 
 ## Frontend
 
-The frontend uses:
+The frontend is built using:
 
 - Next.js App Router
 - React
 - TypeScript
 - Tailwind CSS
 
-The chat interface includes:
+The current frontend includes an initial multi-provider testing interface.
 
-- Provider catalog loading
-- Provider lifecycle information
+Current functionality includes:
+
+- Provider availability information
 - Provider selection
-- Multi-provider request submission
-- Independent provider result display
+- Selection of 2 to 5 providers
+- Backend API communication
+- Multi-provider test workflow
+
+The frontend currently reflects the backend runtime state: Mock is available, while external providers remain planned or inactive.
+
+Further frontend work includes:
+
+- Improved comparison interface
+- Independent provider response presentation
 - Success and failure status display
 - Structured error information
-- Chat turn history
-- Chat clearing
+- Loading and request-state handling
+- Chat history controls
 
-The frontend communicates with the backend API.
-
-A provider shown in the interface is not necessarily active or capable of producing a real response.
+Frontend functionality must be fully verified before the project is considered ready for public beta.
 
 ## Technology stack
 
@@ -203,6 +235,7 @@ Open PowerShell:
 
 ```powershell
 cd "$HOME\AI-UNIVERSE\backend"
+
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8010
 ```
 
@@ -220,6 +253,7 @@ Open a second terminal:
 
 ```powershell
 cd "$HOME\AI-UNIVERSE\frontend"
+
 npm ci
 npm run dev
 ```
@@ -228,11 +262,19 @@ Frontend:
 
 `http://localhost:3000`
 
+The frontend API base URL should point to the local backend:
+
+```dotenv
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8010/api
+```
+
+Place this configuration in `frontend/.env.local`.
+
 ## Environment configuration
 
 Provider settings are loaded from `backend/.env`.
 
-OpenAI configuration uses these variable names:
+OpenAI configuration uses the following environment variable names:
 
 ```dotenv
 AI_UNIVERSE_OPENAI_ENABLED=false
@@ -241,29 +283,53 @@ AI_UNIVERSE_OPENAI_MODEL=
 AI_UNIVERSE_OPENAI_TIMEOUT=30
 ```
 
-The values above are examples, not active credentials.
+These are example values, not active credentials.
 
 Important:
 
 - Never commit `.env` files.
 - Never put API keys in frontend code.
 - Never paste API keys into source files or public issue trackers.
-- Only use credentials with valid authorization for the project.
+- Only use credentials with valid authorization from the account owner.
 - Do not activate a provider until its required checks have passed.
 
 ## Tests and quality checks
 
 ### Backend tests
 
+Run the complete backend test suite:
+
 ```powershell
 cd "$HOME\AI-UNIVERSE\backend"
+
 .\.venv\Scripts\python.exe -m pytest
 ```
+
+**Latest verified backend test result (November 26, 2026):**
+
+- Total tests: 446
+- Passed: 446
+- Failed: 0
+- Skipped: 0
+
+The test suite includes coverage for:
+
+- API endpoints
+- Provider registry and lifecycle
+- Provider adapters and contracts
+- Multi-provider orchestration
+- HTTP client behavior
+- Network security
+- Secure transport
+- Error handling and retry behavior
+
+The latest test run reported one non-blocking Starlette deprecation warning related to HTTPX compatibility.
 
 ### Backend dependency validation
 
 ```powershell
 cd "$HOME\AI-UNIVERSE\backend"
+
 .\.venv\Scripts\python.exe -m pip check
 ```
 
@@ -271,12 +337,13 @@ cd "$HOME\AI-UNIVERSE\backend"
 
 ```powershell
 cd "$HOME\AI-UNIVERSE\frontend"
+
 npx tsc --noEmit
 npm run lint
 npm run build
 ```
 
-## Security principles
+## Security and usage principles
 
 - Keep provider API keys on the backend only.
 - Never commit `.env` files, credentials, or tokens.
@@ -285,64 +352,73 @@ npm run build
 - Use explicit and validated timeout settings for outbound requests.
 - Manage shared HTTP clients through their intended application lifecycle.
 - Integrate providers only through authorized official APIs.
-- Respect provider terms, age requirements, regional restrictions, and licensing.
-- Apply authentication, per-user quotas, rate limits, and cost controls before public production use.
+- Respect provider terms, licensing, age requirements, and regional restrictions.
 - Do not silently switch users to paid providers or paid endpoints.
-- Apply age-appropriate safety and privacy protections when serving minors.
+- Apply authentication, per-user quotas, rate limits, and cost controls before public production use.
 - Do not depend on local model runtimes or user GPUs.
+
+### Age eligibility
+
+AI UNIVERSE is intended exclusively for adults aged 18 and older.
+
+Access restrictions must be implemented and enforced before public availability. Users below the age of 18 are not eligible to use the product.
+
+Provider-specific age requirements and regional restrictions must also be respected.
 
 ## Development roadmap
 
-### Stage 1 — Real provider integrations
+### Stage 1 — Provider Registry and Lifecycle
+
+- Implement provider registration and lookup.
+- Validate provider configuration.
+- Implement provider lifecycle checks.
+- Separate catalog entries from active runtime providers.
+- Support Mock provider registration and testing.
+
+**Status: Completed.**
+
+### Stage 2 — Multi-Provider Orchestration
+
+- Implement concurrent multi-provider requests.
+- Support 2 to 5 providers per request.
+- Isolate individual provider failures.
+- Validate provider responses.
+- Handle unexpected provider exceptions.
+- Preserve the legacy single-provider chat endpoint.
+- Add automated orchestration tests.
+
+**Status: Completed.**
+
+### Stage 3 — Frontend Comparison UI and MVP Validation
+
+- Complete the multi-provider comparison interface.
+- Improve independent response presentation.
+- Improve loading and error states.
+- Verify frontend and backend integration.
+- Complete frontend quality checks.
+- Perform end-to-end MVP validation.
+- Review production safeguards before considering a public beta.
+
+**Status: In progress.**
+
+### Future development
 
 - Verify official API availability and requirements.
 - Complete authorization and policy checks.
-- Activate at least two eligible real providers.
-- Keep Mock available for testing.
+- Activate eligible external providers when integration work resumes.
+- Test multi-provider requests with real services.
+- Implement production authentication.
+- Introduce user-specific quotas and cost controls.
+- Implement persistent chat history.
+- Prepare production deployment.
+- Conduct a public beta readiness review.
 
-### Stage 2 — Multi-model system
+External provider activation is intentionally postponed and is not a requirement for completing the current three development stages.
 
-- Connect the frontend to the backend orchestration endpoint.
-- Support concurrent requests to multiple real providers.
-- Display independent model responses and request statuses.
-
-### Stage 3 — Comparison and MVP
-
-- Compare provider responses.
-- Complete backend and frontend tests.
-- Verify failure handling and security.
-- Prepare a limited public beta after a final review.
-
-### Implemented
-
-- Initial frontend dashboard
-- Backend health endpoint
-- Provider abstraction and registry
-- Mock provider
-- Provider catalog metadata
-- Provider lifecycle management
-- OpenAI adapter and factory implementation
-- Concurrent multi-provider chat endpoint
-- Frontend multi-provider chat interface
-- Shared HTTP client infrastructure
-- Network security configuration and validation
-- HTTP client lifecycle management
-- Automated backend and frontend checks
-
-### Pending
-
-- Final OpenAI activation review
-- At least one additional eligible real provider
-- Successful multi-provider testing with real services
-- Production authentication
-- User-specific quotas
-- Persistent chat history
-- Production deployment
-- Public beta readiness review
-
-## Project
+## Project information
 
 - **Name:** AI UNIVERSE
 - **Type:** Multi-AI platform
 - **Status:** Active development
+- **Target audience:** Adults aged 18 and older
 - **Repository:** https://github.com/MehrbodDev/AI-UNIVERSE
