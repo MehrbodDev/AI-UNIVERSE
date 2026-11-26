@@ -1,4 +1,6 @@
 
+import asyncio
+
 import httpx
 import pytest
 
@@ -54,12 +56,14 @@ def test_register_provider():
 def test_duplicate_registration_raises_error():
     registry = ProviderRegistry()
     registry.register(MockProvider())
+
     with pytest.raises(ValueError, match="already registered"):
         registry.register(MockProvider())
 
 
 def test_get_unknown_provider_raises_error():
     registry = ProviderRegistry()
+
     with pytest.raises(ValueError, match="not registered"):
         registry.get("unknown")
 
@@ -67,6 +71,7 @@ def test_get_unknown_provider_raises_error():
 def test_has_provider():
     registry = ProviderRegistry()
     registry.register(MockProvider())
+
     assert registry.has_provider("mock") is True
     assert registry.has_provider("unknown") is False
 
@@ -74,6 +79,7 @@ def test_has_provider():
 def test_unregister_provider():
     registry = ProviderRegistry()
     registry.register(MockProvider())
+
     assert registry.unregister("mock") is True
     assert registry.has_provider("mock") is False
 
@@ -85,6 +91,7 @@ def test_unregister_unknown_provider():
 
 def test_register_invalid_provider():
     registry = ProviderRegistry()
+
     with pytest.raises(TypeError):
         registry.register("not a provider")
 
@@ -94,6 +101,7 @@ def test_register_provider_with_empty_name():
         provider_name = " "
 
     registry = ProviderRegistry()
+
     with pytest.raises(ValueError, match="non-empty"):
         registry.register(InvalidProvider())
 
@@ -103,6 +111,7 @@ def test_register_provider_with_invalid_model():
         model_name = ""
 
     registry = ProviderRegistry()
+
     with pytest.raises(ValueError, match="model name"):
         registry.register(InvalidProvider())
 
@@ -111,13 +120,19 @@ def test_list_providers_is_sorted():
     registry = ProviderRegistry()
     registry.register(MockProvider())
     registry.register(DummyProvider())
+
     providers = registry.list_providers()
-    assert [item["name"] for item in providers] == ["dummy", "mock"]
+
+    assert [item["name"] for item in providers] == [
+        "dummy",
+        "mock",
+    ]
 
 
 def test_registry_loads_default_provider_configurations():
     registry = ProviderRegistry()
     configurations = registry.list_provider_configs()
+
     assert len(configurations) == 11
     assert {item["name"] for item in configurations} == set(PROVIDER_IDS)
 
@@ -128,20 +143,33 @@ def test_get_provider_config():
         default_model="test-model",
         timeout=60,
     )
-    registry = ProviderRegistry(provider_configs={"dummy": config})
+
+    registry = ProviderRegistry(
+        provider_configs={"dummy": config}
+    )
+
     assert registry.get_provider_config("dummy") is config
 
 
 def test_get_unknown_provider_config_raises_error():
     registry = ProviderRegistry()
+
     with pytest.raises(ValueError, match="Configuration"):
         registry.get_provider_config("unknown")
 
 
 def test_list_provider_configs_does_not_expose_api_key():
-    config = ProviderSettings(api_key="test-secret-key", enabled=True)
-    registry = ProviderRegistry(provider_configs={"dummy": config})
+    config = ProviderSettings(
+        api_key="test-secret-key",
+        enabled=True,
+    )
+
+    registry = ProviderRegistry(
+        provider_configs={"dummy": config}
+    )
+
     result = registry.list_provider_configs()
+
     assert result[0]["has_api_key"] is True
     assert "api_key" not in result[0]
     assert "test-secret-key" not in str(result)
@@ -184,6 +212,25 @@ def test_register_configured_mock_provider():
     assert registry.get("mock") is provider
 
 
+def test_register_configured_mock_provider_without_api_key():
+    config = ProviderSettings(
+        enabled=True,
+        api_key=None,
+        default_model="mock-no-key",
+    )
+
+    registry = ProviderRegistry(
+        provider_configs={"mock": config}
+    )
+
+    provider = registry.register_configured_provider("mock")
+
+    assert isinstance(provider, MockProvider)
+    assert provider.model_name == "mock-no-key"
+    assert registry.has_provider("mock") is True
+    assert registry.has_http_client is False
+
+
 def test_register_configured_provider_rejects_disabled_configuration():
     config = ProviderSettings(
         enabled=False,
@@ -207,13 +254,13 @@ def test_register_configured_provider_rejects_missing_api_key():
     )
 
     registry = ProviderRegistry(
-        provider_configs={"mock": config}
+        provider_configs={"openai": config}
     )
 
     with pytest.raises(ValueError, match="API key"):
-        registry.register_configured_provider("mock")
+        registry.register_configured_provider("openai")
 
-    assert registry.has_provider("mock") is False
+    assert registry.has_provider("openai") is False
 
 
 def test_register_configured_openai_requires_shared_http_client():
@@ -270,8 +317,6 @@ def test_register_configured_openai_uses_injected_shared_http_client():
         finally:
             await client.aclose()
 
-    import asyncio
-
     asyncio.run(run_test())
 
 
@@ -290,8 +335,6 @@ def test_registry_shared_http_client_can_be_cleared():
         assert registry.http_client is None
 
     finally:
-        import asyncio
-
         asyncio.run(client.aclose())
 
 
@@ -302,8 +345,6 @@ def test_registry_rejects_closed_http_client():
 
         with pytest.raises(ValueError, match="must be open"):
             ProviderRegistry(http_client=client)
-
-    import asyncio
 
     asyncio.run(run_test())
 
@@ -343,7 +384,9 @@ def test_register_configured_provider_does_not_expose_api_key():
 
     registry.register_configured_provider("mock")
 
-    assert "secret-test-key" not in str(registry.list_provider_configs())
+    assert "secret-test-key" not in str(
+        registry.list_provider_configs()
+    )
 
 
 def test_register_configured_provider_rejects_invalid_factory():

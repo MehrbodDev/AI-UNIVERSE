@@ -120,6 +120,39 @@ class ProviderLifecycleManager:
                 reason=reason,
             )
 
+        # The internal mock provider has no external policy or API
+        # requirements. Its lifecycle is intentionally independent
+        # of the external provider catalog approval gates.
+        if provider_id == "mock":
+            if config is None:
+                return result(
+                    ProviderLifecycleStatus.CONFIGURATION_REQUIRED,
+                    "Mock provider configuration is missing.",
+                )
+
+            if not enabled:
+                return result(
+                    ProviderLifecycleStatus.DISABLED,
+                    "Mock provider is disabled in its configuration.",
+                )
+
+            if not self._factory.supports_provider("mock"):
+                return result(
+                    ProviderLifecycleStatus.INTEGRATION_UNAVAILABLE,
+                    "Mock provider implementation is unavailable.",
+                )
+
+            if registered:
+                return result(
+                    ProviderLifecycleStatus.READY,
+                    "Internal mock provider is registered and ready.",
+                )
+
+            return result(
+                ProviderLifecycleStatus.NOT_REGISTERED,
+                "Internal mock provider is configured but not registered.",
+            )
+
         if provider.status == ProviderStatus.PLANNED:
             return result(
                 ProviderLifecycleStatus.PLANNED,
@@ -175,7 +208,7 @@ class ProviderLifecycleManager:
                 "No provider implementation is currently available.",
             )
 
-        if provider_id != "mock" and not self._registry.has_http_client:
+        if not self._registry.has_http_client:
             return result(
                 ProviderLifecycleStatus.INTEGRATION_UNAVAILABLE,
                 "The shared HTTP client is not initialized.",
@@ -199,10 +232,9 @@ class ProviderLifecycleManager:
         """
         Activate a provider only after all lifecycle checks pass.
 
-        This method does not bypass catalog, policy, configuration,
-        API-key, factory-support, or shared-client requirements.
+        Mock activation does not require an API key or HTTP client.
+        External providers retain all existing activation requirements.
         """
-
         current_status = self.get_status(provider_id)
 
         if current_status.status != ProviderLifecycleStatus.NOT_REGISTERED:

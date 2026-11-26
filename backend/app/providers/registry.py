@@ -1,4 +1,3 @@
-
 import httpx
 
 from app.config.providers import provider_settings as default_provider_settings
@@ -54,13 +53,11 @@ class ProviderRegistry:
     @property
     def http_client(self) -> httpx.AsyncClient | None:
         """Return the application-scoped shared HTTP client."""
-
         return self._http_client
 
     @property
     def has_http_client(self) -> bool:
         """Return whether an open shared HTTP client is available."""
-
         return (
             self._http_client is not None
             and not self._http_client.is_closed
@@ -70,10 +67,8 @@ class ProviderRegistry:
         """
         Remove providers that may retain application-scoped resources.
 
-        The mock provider is independent of the shared HTTP client and
-        therefore survives application shutdown and client replacement.
+        The mock provider is independent of the shared HTTP client.
         """
-
         provider_names = [
             name
             for name in self._providers
@@ -91,10 +86,8 @@ class ProviderRegistry:
         Set or clear the application-scoped shared HTTP client.
 
         External providers are removed whenever their shared client is
-        cleared or replaced. Passing the same client instance preserves
-        the providers that already use it.
+        cleared or replaced. Passing the same client preserves providers.
         """
-
         if http_client is not None:
             if not isinstance(http_client, httpx.AsyncClient):
                 raise TypeError(
@@ -104,8 +97,6 @@ class ProviderRegistry:
             if http_client.is_closed:
                 raise ValueError("HTTP client must be open.")
 
-        # Preserve providers only when the same non-None client is reused.
-        # Clearing with None must always trigger provider cleanup.
         if (
             http_client is not None
             and http_client is self._http_client
@@ -127,7 +118,6 @@ class ProviderRegistry:
 
     def register(self, provider: BaseProvider) -> None:
         """Register an already-created provider instance."""
-
         if not isinstance(provider, BaseProvider):
             raise TypeError("Provider must inherit from BaseProvider.")
 
@@ -152,11 +142,9 @@ class ProviderRegistry:
         """
         Create and register a provider from its configuration.
 
-        Configuration alone never causes automatic registration.
-        External providers require an enabled configuration, an API key,
-        a supported implementation, and the shared HTTP client.
+        The internal mock provider does not require an API key or shared
+        HTTP client. External providers retain all security requirements.
         """
-
         name = self._validate_name(name)
         self._validate_factory(factory)
 
@@ -170,7 +158,7 @@ class ProviderRegistry:
                 f"Provider '{name}' is disabled in its configuration."
             )
 
-        if not config.has_api_key:
+        if name != "mock" and not config.has_api_key:
             raise ValueError(
                 f"Provider '{name}' API key is missing."
             )

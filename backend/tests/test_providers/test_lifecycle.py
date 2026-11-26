@@ -92,8 +92,8 @@ def test_configuration_does_not_override_planned_status():
         enabled=True,
         api_key="test-api-key",
     )
-    manager = ProviderLifecycleManager(registry)
 
+    manager = ProviderLifecycleManager(registry)
     result = manager.get_status("openai")
 
     assert result.status == ProviderLifecycleStatus.PLANNED
@@ -103,11 +103,12 @@ def test_configuration_does_not_override_planned_status():
 
 def test_disabled_catalog_provider():
     registry = make_registry()
+
     catalog = [
         make_catalog_entry(status=ProviderStatus.DISABLED)
     ]
-    manager = ProviderLifecycleManager(registry, catalog)
 
+    manager = ProviderLifecycleManager(registry, catalog)
     result = manager.get_status("openai")
 
     assert result.status == ProviderLifecycleStatus.DISABLED
@@ -115,13 +116,14 @@ def test_disabled_catalog_provider():
 
 def test_unapproved_policy_requires_review():
     registry = make_registry()
+
     catalog = [
         make_catalog_entry(
             age_policy_status=AgePolicyStatus.NOT_REVIEWED
         )
     ]
-    manager = ProviderLifecycleManager(registry, catalog)
 
+    manager = ProviderLifecycleManager(registry, catalog)
     result = manager.get_status("openai")
 
     assert result.status == ProviderLifecycleStatus.POLICY_REVIEW_REQUIRED
@@ -129,11 +131,12 @@ def test_unapproved_policy_requires_review():
 
 def test_limited_provider_requires_review():
     registry = make_registry()
+
     catalog = [
         make_catalog_entry(status=ProviderStatus.LIMITED)
     ]
-    manager = ProviderLifecycleManager(registry, catalog)
 
+    manager = ProviderLifecycleManager(registry, catalog)
     result = manager.get_status("openai")
 
     assert result.status == ProviderLifecycleStatus.POLICY_REVIEW_REQUIRED
@@ -142,8 +145,8 @@ def test_limited_provider_requires_review():
 def test_missing_configuration():
     registry = ProviderRegistry(provider_configs={})
     catalog = [make_catalog_entry()]
-    manager = ProviderLifecycleManager(registry, catalog)
 
+    manager = ProviderLifecycleManager(registry, catalog)
     result = manager.get_status("openai")
 
     assert result.status == ProviderLifecycleStatus.CONFIGURATION_REQUIRED
@@ -154,8 +157,8 @@ def test_missing_configuration():
 def test_disabled_configuration():
     registry = make_registry(enabled=False)
     catalog = [make_catalog_entry()]
-    manager = ProviderLifecycleManager(registry, catalog)
 
+    manager = ProviderLifecycleManager(registry, catalog)
     result = manager.get_status("openai")
 
     assert result.status == ProviderLifecycleStatus.DISABLED
@@ -164,8 +167,8 @@ def test_disabled_configuration():
 def test_missing_api_key():
     registry = make_registry(api_key=None)
     catalog = [make_catalog_entry()]
-    manager = ProviderLifecycleManager(registry, catalog)
 
+    manager = ProviderLifecycleManager(registry, catalog)
     result = manager.get_status("openai")
 
     assert result.status == ProviderLifecycleStatus.CONFIGURATION_REQUIRED
@@ -177,6 +180,7 @@ def test_provider_without_implementation_is_integration_unavailable():
         enabled=True,
         api_key="test-api-key",
     )
+
     catalog = [make_catalog_entry()]
     manager = ProviderLifecycleManager(registry, catalog)
 
@@ -192,6 +196,7 @@ def test_registered_provider_without_http_client_is_integration_unavailable():
         api_key="test-api-key",
         register_provider=True,
     )
+
     catalog = [make_catalog_entry()]
     manager = ProviderLifecycleManager(registry, catalog)
 
@@ -282,6 +287,7 @@ def test_list_statuses_preserves_catalog_order():
 )
 def test_invalid_provider_id(provider_id):
     registry = make_registry()
+
     manager = ProviderLifecycleManager(
         registry,
         [make_catalog_entry()],
@@ -293,6 +299,7 @@ def test_invalid_provider_id(provider_id):
 
 def test_unknown_provider_id():
     registry = make_registry()
+
     manager = ProviderLifecycleManager(
         registry,
         [make_catalog_entry()],
@@ -319,6 +326,7 @@ def test_api_key_is_never_exposed_in_result():
         enabled=True,
         api_key="secret-test-key",
     )
+
     manager = ProviderLifecycleManager(
         registry,
         [make_catalog_entry()],
@@ -330,10 +338,10 @@ def test_api_key_is_never_exposed_in_result():
     assert "secret-test-key" not in str(result.model_dump())
 
 
-def make_mock_registry():
+def make_mock_registry(api_key="test-mock-key"):
     config = ProviderSettings(
         enabled=True,
-        api_key="test-mock-key",
+        api_key=api_key,
         default_model="lifecycle-mock-model",
     )
 
@@ -354,6 +362,7 @@ def make_mock_catalog():
 
 def test_mock_provider_is_not_registered_before_activation():
     registry = make_mock_registry()
+
     manager = ProviderLifecycleManager(
         registry,
         make_mock_catalog(),
@@ -367,6 +376,7 @@ def test_mock_provider_is_not_registered_before_activation():
 
 def test_activate_provider_registers_supported_mock():
     registry = make_mock_registry()
+
     manager = ProviderLifecycleManager(
         registry,
         make_mock_catalog(),
@@ -380,11 +390,48 @@ def test_activate_provider_registers_supported_mock():
     assert registry.get("mock").model_name == "lifecycle-mock-model"
 
 
+def test_activate_mock_without_api_key_or_http_client():
+    registry = make_mock_registry(api_key=None)
+
+    manager = ProviderLifecycleManager(
+        registry,
+        make_mock_catalog(),
+    )
+
+    result = manager.activate_provider("mock")
+
+    assert result.status == ProviderLifecycleStatus.READY
+    assert result.enabled is True
+    assert result.registered is True
+    assert result.has_api_key is False
+    assert registry.has_http_client is False
+    assert registry.get("mock").model_name == "lifecycle-mock-model"
+
+
+def test_mock_lifecycle_does_not_require_external_policy_approval():
+    registry = make_mock_registry(api_key=None)
+
+    catalog = make_mock_catalog()
+    catalog[0]["status"] = ProviderStatus.PLANNED
+    catalog[0]["integration_mode"] = IntegrationMode.UNDETERMINED
+    catalog[0]["api_status"] = VerificationStatus.NOT_VERIFIED
+    catalog[0]["age_policy_status"] = AgePolicyStatus.NOT_REVIEWED
+    catalog[0]["region_status"] = VerificationStatus.NOT_VERIFIED
+
+    manager = ProviderLifecycleManager(registry, catalog)
+    result = manager.activate_provider("mock")
+
+    assert result.status == ProviderLifecycleStatus.READY
+    assert result.registered is True
+    assert result.has_api_key is False
+
+
 def test_activate_provider_does_not_register_unsupported_provider():
     registry = make_registry(
         enabled=True,
         api_key="test-api-key",
     )
+
     manager = ProviderLifecycleManager(
         registry,
         [make_catalog_entry()],
@@ -402,8 +449,8 @@ def test_activate_provider_does_not_bypass_planned_status():
         enabled=True,
         api_key="test-api-key",
     )
-    manager = ProviderLifecycleManager(registry)
 
+    manager = ProviderLifecycleManager(registry)
     result = manager.activate_provider("openai")
 
     assert result.status == ProviderLifecycleStatus.PLANNED
@@ -413,6 +460,7 @@ def test_activate_provider_does_not_bypass_planned_status():
 
 def test_activate_provider_is_idempotent():
     registry = make_mock_registry()
+
     manager = ProviderLifecycleManager(
         registry,
         make_mock_catalog(),
@@ -423,6 +471,7 @@ def test_activate_provider_is_idempotent():
 
     assert first_result.status == ProviderLifecycleStatus.READY
     assert second_result.status == ProviderLifecycleStatus.READY
+
     assert registry.list_providers() == [
         {"name": "mock", "model": "lifecycle-mock-model"}
     ]

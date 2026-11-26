@@ -281,3 +281,104 @@ def test_multi_chat_does_not_change_legacy_chat_endpoint():
     assert data["provider"] == "mock"
     assert data["model"] == "mock-v1"
     assert "Legacy compatibility test" in data["reply"]
+
+def test_multi_chat_handles_invalid_provider_response(monkeypatch):
+    class InvalidResponseProvider(BaseProvider):
+        provider_name = "invalid"
+        model_name = "invalid-model"
+
+        async def generate(self, request):
+            return "This is not a ProviderResponse"
+
+        async def chat(self, message: str) -> str:
+            return "unused"
+
+    providers = {
+        "mock": SuccessfulProvider("mock", "mock-v1"),
+        "invalid": InvalidResponseProvider(),
+    }
+
+    monkeypatch.setattr(
+        main_module.registry,
+        "get",
+        lambda name: providers[name],
+    )
+
+    with TestClient(main_module.app) as client:
+        response = client.post(
+            "/api/chat/multi",
+            json={
+                "message": "Invalid response test",
+                "providers": ["mock", "invalid"],
+            },
+        )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["total"] == 2
+    assert data["succeeded"] == 1
+    assert data["failed"] == 1
+
+    assert data["results"][0]["status"] == "success"
+
+    invalid_result = data["results"][1]
+
+    assert invalid_result["provider"] == "invalid"
+    assert invalid_result["status"] == "error"
+    assert invalid_result["error"]["code"] == "provider_invalid_response"
+
+
+def test_multi_chat_handles_unexpected_provider_exception(monkeypatch):
+    sensitive_detail = "Sensitive internal exception detail."
+
+    class UnexpectedErrorProvider(BaseProvider):
+        provider_name = "unexpected"
+        model_name = "unexpected-model"
+
+        async def chat(self, message: str) -> str:
+            raise RuntimeError(sensitive_detail)
+
+    providers = {
+        "mock": SuccessfulProvider("mock", "mock-v1"),
+        "unexpected": UnexpectedErrorProvider(),
+    }
+
+    monkeypatch.setattr(
+        main_module.registry,
+        "get",
+        lambda name: providers[name],
+    )
+
+    with TestClient(main_module.app) as client:
+        response = client.post(
+            "/api/chat/multi",
+            json={
+                "message": "Unexpected exception test",
+                "providers": ["mock", "unexpected"],
+            },
+        )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["total"] == 2
+    assert data["succeeded"] == 1
+    assert data["failed"] == 1
+
+    assert data["results"][0]["status"] == "success"
+
+    failed_result = data["results"][1]
+
+    assert failed_result["provider"] == "unexpected"
+    assert failed_result["model"] == "unexpected-model"
+    assert failed_result["status"] == "error"
+    assert failed_result["error"]["code"] == "provider_internal_error"
+    assert (
+        failed_result["error"]["message"]
+        == "An unexpected provider error occurred."
+    )
+
+    assert sensitive_detail not in response.text
